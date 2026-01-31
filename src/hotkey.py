@@ -187,8 +187,9 @@ class HotkeyManager:
 # Common hotkey presets
 HOTKEY_PRESETS = {
     "Ctrl+Shift+Space": "ctrl+shift+space",
-    "Ctrl+Alt+V": "ctrl+alt+v",
+    "右Alt": "right alt",
+    "右Shift": "right shift",
     "F9": "f9",
+    "Ctrl+Alt+V": "ctrl+alt+v",
     "Ctrl+`": "ctrl+`",
-    "Win+H": "win+h",
 }

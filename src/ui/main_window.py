@@ -17,6 +17,7 @@ from ..hotkey import HotkeyManager, HotkeyConfig, HOTKEY_PRESETS
 from ..audio_control import get_audio_controller, AudioController
 from ..text_input import type_to_focused_field
 from .icon import create_tray_icon, create_recording_icon, create_processing_icon
+from .overlay import OverlayIndicator
 
 
 class HotkeyCapture(QLineEdit):
@@ -283,6 +284,7 @@ class MainWindow(QMainWindow):
         
         self._setup_ui()
         self._setup_tray()
+        self._setup_overlay()
         
         # Start hotkey listening
         self.hotkey_manager.start()
@@ -390,6 +392,11 @@ class MainWindow(QMainWindow):
         
         layout.addLayout(hotkey_layout)
     
+    def _setup_overlay(self):
+        """Setup the overlay indicator."""
+        self.overlay = OverlayIndicator(size=24)
+        self.overlay.show_indicator()
+    
     def _setup_tray(self):
         """Setup system tray icon."""
         # Create icons
@@ -463,10 +470,11 @@ class MainWindow(QMainWindow):
         self.status_label.setStyleSheet("color: red; font-weight: bold;")
         self.result_text.clear()
         
-        # Update tray
+        # Update tray and overlay
         self.tray_record_action.setText("⏹️ 録音停止")
         self.tray_icon.setIcon(self._icon_recording)
         self.tray_icon.setToolTip("Chotto Voice 🔴 録音中...")
+        self.overlay.set_state("recording")
     
     def _stop_recording(self):
         """Stop recording and process."""
@@ -489,10 +497,11 @@ class MainWindow(QMainWindow):
         """)
         self.level_bar.setValue(0)
         
-        # Update tray
+        # Update tray and overlay
         self.tray_record_action.setText("🎤 録音開始")
         self.tray_icon.setIcon(self._icon_normal)
         self.tray_icon.setToolTip("Chotto Voice 🎤")
+        self.overlay.set_state("idle")
         
         if audio_data:
             self.status_label.setText("⏳ 処理中...")
@@ -500,6 +509,7 @@ class MainWindow(QMainWindow):
             self.record_btn.setEnabled(False)
             self.tray_icon.setIcon(self._icon_processing)
             self.tray_icon.setToolTip("Chotto Voice ⏳ 処理中...")
+            self.overlay.set_state("processing")
             
             # Start worker
             self._worker = TranscriptionWorker(
@@ -552,9 +562,10 @@ class MainWindow(QMainWindow):
             if text:
                 self.result_text.setText(text)
         
-        # Restore tray icon
+        # Restore tray icon and overlay
         self.tray_icon.setIcon(self._icon_normal)
         self.tray_icon.setToolTip("Chotto Voice 🎤")
+        self.overlay.set_state("idle")
         
         if text and self._auto_type:
             # Small delay then type to focused field
@@ -575,9 +586,10 @@ class MainWindow(QMainWindow):
         self.status_label.setText(f"❌ エラー: {error}")
         self.status_label.setStyleSheet("color: red;")
         
-        # Restore tray icon
+        # Restore tray icon and overlay
         self.tray_icon.setIcon(self._icon_normal)
         self.tray_icon.setToolTip("Chotto Voice 🎤")
+        self.overlay.set_state("idle")
     
     # === Hotkey callbacks ===
     

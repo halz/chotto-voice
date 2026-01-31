@@ -28,5 +28,5 @@ pyperclip>=1.8.2
 pycaw>=20230407; sys_platform == "win32"
 comtypes>=1.2.0; sys_platform == "win32"
 
-# Build/Package (for later)
-# pyinstaller>=6.0.0
+# Build/Package
+pyinstaller>=6.0.0
