@@ -524,14 +524,16 @@ class MainWindow(QMainWindow):
     
     def _on_transcription_done(self, text: str):
         """Handle transcription completion."""
-        if text:
+        # Only show if not processing with AI (AI will replace it)
+        if text and not (self._process_with_ai and self.ai_client):
             self.result_text.setText(text)
+        self._final_result = text
     
     def _on_ai_chunk(self, chunk: str):
         """Handle AI response chunk - update result with AI processed text."""
-        # Clear and show AI result as it streams
-        if self.result_text.toPlainText() and not hasattr(self, '_ai_started'):
-            self._ai_started = True
+        # First chunk - clear the display
+        if not hasattr(self, '_ai_receiving'):
+            self._ai_receiving = True
             self.result_text.clear()
         self.result_text.insertPlainText(chunk)
     
@@ -541,13 +543,14 @@ class MainWindow(QMainWindow):
         self.status_label.setText("✅ 完了")
         self.status_label.setStyleSheet("color: green;")
         
-        # Reset AI flag
-        if hasattr(self, '_ai_started'):
-            delattr(self, '_ai_started')
+        # Reset flags
+        if hasattr(self, '_ai_receiving'):
+            delattr(self, '_ai_receiving')
         
-        # Show final result
-        if text:
-            self.result_text.setText(text)
+        # Only update if we weren't streaming (streaming already updated)
+        if not self._process_with_ai or not self.ai_client:
+            if text:
+                self.result_text.setText(text)
         
         # Restore tray icon
         self.tray_icon.setIcon(self._icon_normal)
