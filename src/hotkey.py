@@ -50,36 +50,55 @@ class HotkeyManager:
         if self._registered:
             return
         
-        # Use add_hotkey for proper suppression of the full key combo
+        key = self.config.key.lower()
+        
+        # Check if this is a single modifier key (needs special handling)
+        if key in SINGLE_MODIFIER_KEYS:
+            self._setup_single_modifier_hotkey(key)
+        else:
+            self._setup_combo_hotkey(key)
+        
+        self._registered = True
+    
+    def _setup_single_modifier_hotkey(self, key: str):
+        """Setup hotkey for single modifier keys like right shift."""
+        # For single modifier keys, we detect press and release
+        # and trigger on quick press-release (tap)
+        self._modifier_press_time = 0
+        self._modifier_tap_threshold = 0.3  # seconds
+        
+        def on_press(event):
+            if event.name == key or event.name == key.replace(" ", "_"):
+                self._modifier_press_time = time.time()
+        
+        def on_release(event):
+            key_name = event.name.lower().replace("_", " ")
+            if key_name == key or event.name.lower() == key.replace(" ", ""):
+                # Check if it was a quick tap (not held for other purposes)
+                elapsed = time.time() - self._modifier_press_time
+                if 0.05 < elapsed < self._modifier_tap_threshold:
+                    self._on_hotkey_pressed()
+        
+        keyboard.on_press(on_press)
+        keyboard.on_release(on_release)
+    
+    def _setup_combo_hotkey(self, key: str):
+        """Setup hotkey for key combinations."""
         try:
             keyboard.add_hotkey(
-                self.config.key,
+                key,
                 self._on_hotkey_pressed,
                 suppress=True,
                 trigger_on_release=False
             )
-            
-            # Also listen for release of the main key
-            keyboard.on_release_key(
-                self._get_trigger_key(),
-                self._on_key_up,
-                suppress=False
-            )
         except Exception as e:
             print(f"Hotkey registration error: {e}")
-            # Fallback to old method
+            # Fallback
             keyboard.on_press_key(
                 self._get_trigger_key(),
                 self._on_key_down,
                 suppress=False
             )
-            keyboard.on_release_key(
-                self._get_trigger_key(),
-                self._on_key_up,
-                suppress=False
-            )
-        
-        self._registered = True
     
     def _on_hotkey_pressed(self):
         """Handle full hotkey combo press - toggle recording."""
@@ -187,9 +206,12 @@ class HotkeyManager:
 # Common hotkey presets
 HOTKEY_PRESETS = {
     "Ctrl+Shift+Space": "ctrl+shift+space",
-    "右Alt": "right alt",
-    "右Shift": "right shift",
+    "右Alt (単体)": "right alt",
+    "右Shift (単体)": "right shift", 
     "F9": "f9",
     "Ctrl+Alt+V": "ctrl+alt+v",
     "Ctrl+`": "ctrl+`",
 }
+
+# Single modifier keys that need special handling
+SINGLE_MODIFIER_KEYS = {"right alt", "left alt", "right shift", "left shift", "right ctrl", "left ctrl"}
