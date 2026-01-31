@@ -525,16 +525,14 @@ class MainWindow(QMainWindow):
     def _on_transcription_done(self, text: str):
         """Handle transcription completion."""
         if text:
-            self.result_text.setText(f"[音声認識] {text}")
-            if self._process_with_ai and self.ai_client:
-                self.result_text.append("\n[AI処理中...]")
+            self.result_text.setText(text)
     
     def _on_ai_chunk(self, chunk: str):
-        """Handle AI response chunk."""
-        current = self.result_text.toPlainText()
-        if "[AI処理中...]" in current:
-            current = current.replace("[AI処理中...]", "")
-            self.result_text.setText(current)
+        """Handle AI response chunk - update result with AI processed text."""
+        # Clear and show AI result as it streams
+        if self.result_text.toPlainText() and not hasattr(self, '_ai_started'):
+            self._ai_started = True
+            self.result_text.clear()
         self.result_text.insertPlainText(chunk)
     
     def _on_finished(self, text: str):
@@ -542,6 +540,14 @@ class MainWindow(QMainWindow):
         self.record_btn.setEnabled(True)
         self.status_label.setText("✅ 完了")
         self.status_label.setStyleSheet("color: green;")
+        
+        # Reset AI flag
+        if hasattr(self, '_ai_started'):
+            delattr(self, '_ai_started')
+        
+        # Show final result
+        if text:
+            self.result_text.setText(text)
         
         # Restore tray icon
         self.tray_icon.setIcon(self._icon_normal)
