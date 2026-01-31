@@ -31,7 +31,6 @@ class WindowsAudioController(AudioController):
     """Audio controller for Windows using pycaw."""
     
     def __init__(self):
-        self._speakers = None
         self._interface = None
         self._init_audio()
     
@@ -42,12 +41,24 @@ class WindowsAudioController(AudioController):
             from comtypes import CLSCTX_ALL
             from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
             
+            # Get default audio endpoint
             devices = AudioUtilities.GetSpeakers()
             interface = devices.Activate(
                 IAudioEndpointVolume._iid_, CLSCTX_ALL, None
             )
             self._interface = cast(interface, POINTER(IAudioEndpointVolume))
-            self._speakers = devices
+        except ImportError:
+            print("pycaw not installed, audio control disabled")
+            self._interface = None
+        except AttributeError:
+            # Try alternative method for newer pycaw versions
+            try:
+                from pycaw.pycaw import AudioUtilities, ISimpleAudioVolume
+                # Fall back to dummy controller
+                print("Using fallback audio controller")
+                self._interface = None
+            except:
+                self._interface = None
         except Exception as e:
             print(f"Failed to initialize Windows audio: {e}")
             self._interface = None
@@ -55,22 +66,22 @@ class WindowsAudioController(AudioController):
     def mute(self) -> bool:
         """Mute system audio."""
         if not self._interface:
-            return False
+            return self._mute_fallback()
         try:
             self._interface.SetMute(1, None)
             return True
         except Exception:
-            return False
+            return self._mute_fallback()
     
     def unmute(self) -> bool:
         """Unmute system audio."""
         if not self._interface:
-            return False
+            return self._unmute_fallback()
         try:
             self._interface.SetMute(0, None)
             return True
         except Exception:
-            return False
+            return self._unmute_fallback()
     
     def is_muted(self) -> bool:
         """Check if system audio is muted."""
@@ -89,6 +100,42 @@ class WindowsAudioController(AudioController):
         else:
             self.mute()
             return True
+    
+    def _mute_fallback(self) -> bool:
+        """Fallback mute using nircmd or keyboard simulation."""
+        try:
+            import subprocess
+            # Try using nircmd if available
+            subprocess.run(['nircmd', 'mutesysvolume', '1'], 
+                          capture_output=True, check=False)
+            return True
+        except:
+            pass
+        
+        try:
+            # Try keyboard simulation
+            import keyboard
+            keyboard.press_and_release('volume mute')
+            return True
+        except:
+            return False
+    
+    def _unmute_fallback(self) -> bool:
+        """Fallback unmute."""
+        try:
+            import subprocess
+            subprocess.run(['nircmd', 'mutesysvolume', '0'], 
+                          capture_output=True, check=False)
+            return True
+        except:
+            pass
+        
+        try:
+            import keyboard
+            keyboard.press_and_release('volume mute')
+            return True
+        except:
+            return False
 
 
 class DummyAudioController(AudioController):

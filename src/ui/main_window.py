@@ -16,6 +16,7 @@ from ..ai_client import AIClient
 from ..hotkey import HotkeyManager, HotkeyConfig, HOTKEY_PRESETS
 from ..audio_control import get_audio_controller, AudioController
 from ..text_input import type_to_focused_field
+from .icon import create_tray_icon, create_recording_icon, create_processing_icon
 
 
 class HotkeyCapture(QLineEdit):
@@ -391,7 +392,13 @@ class MainWindow(QMainWindow):
     
     def _setup_tray(self):
         """Setup system tray icon."""
+        # Create icons
+        self._icon_normal = create_tray_icon()
+        self._icon_recording = create_recording_icon()
+        self._icon_processing = create_processing_icon()
+        
         self.tray_icon = QSystemTrayIcon(self)
+        self.tray_icon.setIcon(self._icon_normal)
         self.tray_icon.setToolTip("Chotto Voice 🎤")
         
         # Tray menu
@@ -458,6 +465,7 @@ class MainWindow(QMainWindow):
         
         # Update tray
         self.tray_record_action.setText("⏹️ 録音停止")
+        self.tray_icon.setIcon(self._icon_recording)
         self.tray_icon.setToolTip("Chotto Voice 🔴 録音中...")
     
     def _stop_recording(self):
@@ -483,12 +491,14 @@ class MainWindow(QMainWindow):
         
         # Update tray
         self.tray_record_action.setText("🎤 録音開始")
+        self.tray_icon.setIcon(self._icon_normal)
         self.tray_icon.setToolTip("Chotto Voice 🎤")
         
         if audio_data:
             self.status_label.setText("⏳ 処理中...")
             self.status_label.setStyleSheet("color: orange;")
             self.record_btn.setEnabled(False)
+            self.tray_icon.setIcon(self._icon_processing)
             self.tray_icon.setToolTip("Chotto Voice ⏳ 処理中...")
             
             # Start worker
@@ -533,6 +543,10 @@ class MainWindow(QMainWindow):
         self.status_label.setText("✅ 完了")
         self.status_label.setStyleSheet("color: green;")
         
+        # Restore tray icon
+        self.tray_icon.setIcon(self._icon_normal)
+        self.tray_icon.setToolTip("Chotto Voice 🎤")
+        
         if text and self._auto_type:
             # Small delay then type to focused field
             QTimer.singleShot(100, lambda: self._type_result(text))
@@ -551,6 +565,10 @@ class MainWindow(QMainWindow):
         self.record_btn.setEnabled(True)
         self.status_label.setText(f"❌ エラー: {error}")
         self.status_label.setStyleSheet("color: red;")
+        
+        # Restore tray icon
+        self.tray_icon.setIcon(self._icon_normal)
+        self.tray_icon.setToolTip("Chotto Voice 🎤")
     
     # === Hotkey callbacks ===
     
