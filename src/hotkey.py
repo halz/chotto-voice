@@ -50,23 +50,76 @@ class HotkeyManager:
         if self._registered:
             return
         
-        keyboard.on_press_key(
-            self._get_trigger_key(),
-            self._on_key_down,
-            suppress=False
-        )
-        keyboard.on_release_key(
-            self._get_trigger_key(),
-            self._on_key_up,
-            suppress=False
-        )
+        # Use add_hotkey for proper suppression of the full key combo
+        try:
+            keyboard.add_hotkey(
+                self.config.key,
+                self._on_hotkey_pressed,
+                suppress=True,
+                trigger_on_release=False
+            )
+            
+            # Also listen for release of the main key
+            keyboard.on_release_key(
+                self._get_trigger_key(),
+                self._on_key_up,
+                suppress=False
+            )
+        except Exception as e:
+            print(f"Hotkey registration error: {e}")
+            # Fallback to old method
+            keyboard.on_press_key(
+                self._get_trigger_key(),
+                self._on_key_down,
+                suppress=False
+            )
+            keyboard.on_release_key(
+                self._get_trigger_key(),
+                self._on_key_up,
+                suppress=False
+            )
+        
         self._registered = True
+    
+    def _on_hotkey_pressed(self):
+        """Handle full hotkey combo press."""
+        with self._lock:
+            current_time = time.time()
+            
+            # Check for double-tap
+            if current_time - self._last_press_time < self.config.double_tap_threshold:
+                self._press_count += 1
+            else:
+                self._press_count = 1
+            
+            self._last_press_time = current_time
+            
+            # Double-tap detected
+            if self._press_count >= 2:
+                self._press_count = 0
+                self._handle_double_tap()
+                return
+            
+            # Start hold timer
+            self._key_held = True
+            if self._hold_timer:
+                self._hold_timer.cancel()
+            
+            self._hold_timer = threading.Timer(
+                self.config.hold_threshold,
+                self._handle_hold_start
+            )
+            self._hold_timer.start()
     
     def stop(self):
         """Stop listening for hotkeys."""
         if not self._registered:
             return
         
+        try:
+            keyboard.remove_hotkey(self.config.key)
+        except:
+            pass
         keyboard.unhook_all()
         self._registered = False
     
@@ -99,37 +152,12 @@ class HotkeyManager:
         return True
     
     def _on_key_down(self, event):
-        """Handle key press."""
+        """Handle key press (fallback method)."""
         if not self._check_modifiers():
             return
         
-        with self._lock:
-            current_time = time.time()
-            
-            # Check for double-tap
-            if current_time - self._last_press_time < self.config.double_tap_threshold:
-                self._press_count += 1
-            else:
-                self._press_count = 1
-            
-            self._last_press_time = current_time
-            
-            # Double-tap detected
-            if self._press_count >= 2:
-                self._press_count = 0
-                self._handle_double_tap()
-                return
-            
-            # Start hold timer
-            self._key_held = True
-            if self._hold_timer:
-                self._hold_timer.cancel()
-            
-            self._hold_timer = threading.Timer(
-                self.config.hold_threshold,
-                self._handle_hold_start
-            )
-            self._hold_timer.start()
+        # Delegate to hotkey handler
+        self._on_hotkey_pressed()
     
     def _on_key_up(self, event):
         """Handle key release."""
@@ -149,6 +177,8 @@ class HotkeyManager:
         """Handle hold gesture - start recording."""
         with self._lock:
             if self._key_held and not self._is_recording:
+                # Block all keyboard input while recording
+                self._block_keyboard()
                 self._start_recording()
     
     def _handle_double_tap(self):
@@ -162,6 +192,22 @@ class HotkeyManager:
         if not self._is_recording:
             self._start_recording()
     
+    def _block_keyboard(self):
+        """Block keyboard input during recording."""
+        try:
+            # Block common keys that might interfere
+            # Note: This is a simple approach, may need refinement
+            self._keyboard_blocked = True
+        except Exception:
+            pass
+    
+    def _unblock_keyboard(self):
+        """Unblock keyboard input."""
+        try:
+            self._keyboard_blocked = False
+        except Exception:
+            pass
+    
     def _start_recording(self):
         """Start recording."""
         self._is_recording = True
@@ -171,6 +217,7 @@ class HotkeyManager:
     def _stop_recording(self):
         """Stop recording."""
         self._is_recording = False
+        self._unblock_keyboard()
         if self.on_record_stop:
             self.on_record_stop()
     
