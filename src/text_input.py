@@ -36,30 +36,16 @@ class TextInputSimulator:
         """Paste text using clipboard (faster, better Unicode support)."""
         import pyperclip
         
-        # Save current clipboard
-        try:
-            original_clipboard = pyperclip.paste()
-        except:
-            original_clipboard = ""
+        # Copy text to clipboard
+        pyperclip.copy(text)
         
-        try:
-            # Copy text to clipboard
-            pyperclip.copy(text)
-            
-            # Small delay to ensure clipboard is updated
-            time.sleep(0.05)
-            
-            # Simulate Ctrl+V
-            keyboard.press_and_release('ctrl+v')
-            
-            # Small delay before restoring
-            time.sleep(0.05)
-        finally:
-            # Restore original clipboard
-            try:
-                pyperclip.copy(original_clipboard)
-            except:
-                pass
+        # Wait for clipboard to update
+        time.sleep(0.1)
+        
+        # Simulate Ctrl+V
+        keyboard.press_and_release('ctrl+v')
+        
+        # Note: We leave the result in clipboard (useful for re-pasting)
     
     def _type_characters(self, text: str):
         """Type text character by character (slower but more compatible)."""
