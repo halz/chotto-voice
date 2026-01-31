@@ -287,9 +287,14 @@ class MainWindow(QMainWindow):
         self.hotkey_manager.start()
     
     def _setup_ui(self):
-        """Setup the user interface."""
-        self.setWindowTitle("Chotto Voice 🎤")
+        """Setup the user interface (Settings window)."""
+        self.setWindowTitle("Chotto Voice - 設定")
         self.setMinimumSize(450, 350)
+        self.setWindowFlags(
+            Qt.WindowType.Window |
+            Qt.WindowType.WindowCloseButtonHint |
+            Qt.WindowType.WindowMinimizeButtonHint
+        )
         
         # Central widget
         central = QWidget()
@@ -387,16 +392,26 @@ class MainWindow(QMainWindow):
     def _setup_tray(self):
         """Setup system tray icon."""
         self.tray_icon = QSystemTrayIcon(self)
+        self.tray_icon.setToolTip("Chotto Voice 🎤")
         
         # Tray menu
         tray_menu = QMenu()
         
-        show_action = QAction("表示", self)
-        show_action.triggered.connect(self.show)
-        tray_menu.addAction(show_action)
+        # Recording control
+        self.tray_record_action = QAction("🎤 録音開始", self)
+        self.tray_record_action.triggered.connect(self._toggle_recording)
+        tray_menu.addAction(self.tray_record_action)
         
         tray_menu.addSeparator()
         
+        # Settings
+        settings_action = QAction("⚙️ 設定", self)
+        settings_action.triggered.connect(self._show_settings)
+        tray_menu.addAction(settings_action)
+        
+        tray_menu.addSeparator()
+        
+        # Quit
         quit_action = QAction("終了", self)
         quit_action.triggered.connect(self._quit_app)
         tray_menu.addAction(quit_action)
@@ -404,6 +419,14 @@ class MainWindow(QMainWindow):
         self.tray_icon.setContextMenu(tray_menu)
         self.tray_icon.activated.connect(self._tray_activated)
         self.tray_icon.show()
+        
+        # Show startup notification
+        self.tray_icon.showMessage(
+            "Chotto Voice",
+            f"システムトレイで起動しました\nホットキー: {self.hotkey_config.key}",
+            QSystemTrayIcon.MessageIcon.Information,
+            2000
+        )
     
     def _toggle_recording(self):
         """Toggle recording state."""
@@ -432,6 +455,10 @@ class MainWindow(QMainWindow):
         self.status_label.setText("🔴 録音中...")
         self.status_label.setStyleSheet("color: red; font-weight: bold;")
         self.result_text.clear()
+        
+        # Update tray
+        self.tray_record_action.setText("⏹️ 録音停止")
+        self.tray_icon.setToolTip("Chotto Voice 🔴 録音中...")
     
     def _stop_recording(self):
         """Stop recording and process."""
@@ -454,10 +481,15 @@ class MainWindow(QMainWindow):
         """)
         self.level_bar.setValue(0)
         
+        # Update tray
+        self.tray_record_action.setText("🎤 録音開始")
+        self.tray_icon.setToolTip("Chotto Voice 🎤")
+        
         if audio_data:
             self.status_label.setText("⏳ 処理中...")
             self.status_label.setStyleSheet("color: orange;")
             self.record_btn.setEnabled(False)
+            self.tray_icon.setToolTip("Chotto Voice ⏳ 処理中...")
             
             # Start worker
             self._worker = TranscriptionWorker(
@@ -561,11 +593,19 @@ class MainWindow(QMainWindow):
         # Re-enable hotkey listening
         self.hotkey_manager.start()
     
+    def _show_settings(self):
+        """Show the settings window."""
+        self.show()
+        self.activateWindow()
+        self.raise_()
+    
     def _tray_activated(self, reason):
         """Handle tray icon activation."""
         if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
-            self.show()
-            self.activateWindow()
+            self._show_settings()
+        elif reason == QSystemTrayIcon.ActivationReason.Trigger:
+            # Single click - could toggle recording
+            pass
     
     def closeEvent(self, event: QCloseEvent):
         """Handle close event - minimize to tray."""

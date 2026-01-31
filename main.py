@@ -58,8 +58,14 @@ def main():
     
     window = MainWindow(recorder, transcriber, ai_client, hotkey_config)
     
-    if not settings.start_minimized:
-        window.show()
+    # Start minimized to tray by default
+    if settings.start_minimized:
+        # Just don't show the window
+        pass
+    else:
+        # For debugging/first run, can show window
+        # window.show()
+        pass
     
     sys.exit(app.exec())
 

@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     
     # UI Settings
     language: Literal["ja", "en"] = "ja"
-    start_minimized: bool = False
+    start_minimized: bool = True  # Start in system tray by default
     
     # Hotkey Settings
     hotkey: str = "ctrl+shift+space"
