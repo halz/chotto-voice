@@ -1,87 +1,81 @@
 """Generate application icon for system tray."""
-from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont
-from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont, QBrush, QPen
+from PyQt6.QtCore import Qt, QRect
 
 
-def create_tray_icon(text: str = "🎤", size: int = 64) -> QIcon:
-    """
-    Create a simple tray icon with emoji or text.
-    
-    Args:
-        text: Emoji or text to display
-        size: Icon size in pixels
-    
-    Returns:
-        QIcon object
-    """
+def create_tray_icon(size: int = 32) -> QIcon:
+    """Create a simple tray icon."""
     pixmap = QPixmap(size, size)
-    pixmap.fill(Qt.GlobalColor.transparent)
+    pixmap.fill(QColor(0, 0, 0, 0))  # Transparent
     
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    
-    # Draw background circle
-    painter.setBrush(QColor(76, 175, 80))  # Green
-    painter.setPen(Qt.PenStyle.NoPen)
-    painter.drawEllipse(2, 2, size - 4, size - 4)
-    
-    # Draw text/emoji
-    painter.setPen(QColor(255, 255, 255))
-    font = QFont()
-    font.setPointSize(int(size * 0.5))
-    painter.setFont(font)
-    painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, "V")
-    
-    painter.end()
+    painter = QPainter()
+    if painter.begin(pixmap):
+        try:
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            
+            # Draw green circle
+            painter.setBrush(QBrush(QColor(76, 175, 80)))
+            painter.setPen(QPen(Qt.PenStyle.NoPen))
+            painter.drawEllipse(1, 1, size - 2, size - 2)
+            
+            # Draw "V" letter
+            painter.setPen(QPen(QColor(255, 255, 255)))
+            font = QFont("Arial", int(size * 0.45), QFont.Weight.Bold)
+            painter.setFont(font)
+            painter.drawText(QRect(0, 0, size, size), Qt.AlignmentFlag.AlignCenter, "V")
+        finally:
+            painter.end()
     
     return QIcon(pixmap)
 
 
-def create_recording_icon(size: int = 64) -> QIcon:
+def create_recording_icon(size: int = 32) -> QIcon:
     """Create icon for recording state."""
     pixmap = QPixmap(size, size)
-    pixmap.fill(Qt.GlobalColor.transparent)
+    pixmap.fill(QColor(0, 0, 0, 0))
     
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    
-    # Draw red circle
-    painter.setBrush(QColor(244, 67, 54))  # Red
-    painter.setPen(Qt.PenStyle.NoPen)
-    painter.drawEllipse(2, 2, size - 4, size - 4)
-    
-    # Draw inner circle (recording indicator)
-    painter.setBrush(QColor(255, 255, 255))
-    inner_size = size // 3
-    offset = (size - inner_size) // 2
-    painter.drawEllipse(offset, offset, inner_size, inner_size)
-    
-    painter.end()
+    painter = QPainter()
+    if painter.begin(pixmap):
+        try:
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            
+            # Draw red circle
+            painter.setBrush(QBrush(QColor(244, 67, 54)))
+            painter.setPen(QPen(Qt.PenStyle.NoPen))
+            painter.drawEllipse(1, 1, size - 2, size - 2)
+            
+            # Draw white inner circle
+            painter.setBrush(QBrush(QColor(255, 255, 255)))
+            inner = size // 3
+            offset = (size - inner) // 2
+            painter.drawEllipse(offset, offset, inner, inner)
+        finally:
+            painter.end()
     
     return QIcon(pixmap)
 
 
-def create_processing_icon(size: int = 64) -> QIcon:
+def create_processing_icon(size: int = 32) -> QIcon:
     """Create icon for processing state."""
     pixmap = QPixmap(size, size)
-    pixmap.fill(Qt.GlobalColor.transparent)
+    pixmap.fill(QColor(0, 0, 0, 0))
     
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    
-    # Draw orange circle
-    painter.setBrush(QColor(255, 152, 0))  # Orange
-    painter.setPen(Qt.PenStyle.NoPen)
-    painter.drawEllipse(2, 2, size - 4, size - 4)
-    
-    # Draw text
-    painter.setPen(QColor(255, 255, 255))
-    font = QFont()
-    font.setPointSize(int(size * 0.4))
-    font.setBold(True)
-    painter.setFont(font)
-    painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, "...")
-    
-    painter.end()
+    painter = QPainter()
+    if painter.begin(pixmap):
+        try:
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            
+            # Draw orange circle
+            painter.setBrush(QBrush(QColor(255, 152, 0)))
+            painter.setPen(QPen(Qt.PenStyle.NoPen))
+            painter.drawEllipse(1, 1, size - 2, size - 2)
+            
+            # Draw "..." text
+            painter.setPen(QPen(QColor(255, 255, 255)))
+            font = QFont("Arial", int(size * 0.35), QFont.Weight.Bold)
+            painter.setFont(font)
+            painter.drawText(QRect(0, 0, size, size), Qt.AlignmentFlag.AlignCenter, "•••")
+        finally:
+            painter.end()
     
     return QIcon(pixmap)
