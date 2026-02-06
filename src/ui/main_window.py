@@ -10,12 +10,15 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QIcon, QAction, QCloseEvent, QKeyEvent
 
+import sys
+
 from ..audio import AudioRecorder
 from ..transcriber import Transcriber
 from ..ai_client import AIClient
 from ..hotkey import HotkeyManager, HotkeyConfig, HOTKEY_PRESETS
 from ..audio_control import get_audio_controller, AudioController
 from ..text_input import type_to_focused_field
+from ..user_config import UserConfig, is_startup_enabled, set_startup_enabled
 from .icon import create_tray_icon, create_recording_icon, create_processing_icon
 from .overlay import OverlayIndicator
 
@@ -251,7 +254,8 @@ class MainWindow(QMainWindow):
         recorder: AudioRecorder,
         transcriber: Transcriber,
         ai_client: Optional[AIClient] = None,
-        hotkey_config: Optional[HotkeyConfig] = None
+        hotkey_config: Optional[HotkeyConfig] = None,
+        user_config: Optional[UserConfig] = None
     ):
         super().__init__()
         self.recorder = recorder
@@ -264,12 +268,19 @@ class MainWindow(QMainWindow):
         self.audio_controller: AudioController = get_audio_controller()
         self._was_muted_before_recording = False
         
-        # Settings
-        self._auto_type = True  # Auto-type to focused field
-        self._process_with_ai = True  # Process with AI after transcription
+        # User config (persistent settings)
+        self.user_config = user_config or UserConfig.load()
         
-        # Setup hotkey manager
-        self.hotkey_config = hotkey_config or HotkeyConfig()
+        # Settings from user config
+        self._auto_type = self.user_config.auto_type
+        self._process_with_ai = self.user_config.process_with_ai
+        
+        # Setup hotkey manager with config from user_config
+        self.hotkey_config = hotkey_config or HotkeyConfig(
+            key=self.user_config.hotkey,
+            double_tap_threshold=self.user_config.hotkey_double_tap_threshold,
+            hold_threshold=self.user_config.hotkey_hold_threshold
+        )
         self.hotkey_manager = HotkeyManager(
             config=self.hotkey_config,
             on_record_start=self._on_hotkey_record_start,
@@ -362,16 +373,29 @@ class MainWindow(QMainWindow):
         
         self.auto_type_check = QCheckBox("フォーカス中のフィールドに入力")
         self.auto_type_check.setChecked(self._auto_type)
-        self.auto_type_check.toggled.connect(lambda v: setattr(self, '_auto_type', v))
+        self.auto_type_check.toggled.connect(self._on_auto_type_changed)
         options_layout.addWidget(self.auto_type_check)
         
         self.ai_process_check = QCheckBox("AIで整形")
         self.ai_process_check.setChecked(self._process_with_ai)
         self.ai_process_check.setEnabled(self.ai_client is not None)
-        self.ai_process_check.toggled.connect(lambda v: setattr(self, '_process_with_ai', v))
+        self.ai_process_check.toggled.connect(self._on_ai_process_changed)
         options_layout.addWidget(self.ai_process_check)
         
         layout.addLayout(options_layout)
+        
+        # Startup options (Windows only)
+        if sys.platform == "win32":
+            startup_layout = QHBoxLayout()
+            
+            self.startup_check = QCheckBox("Windowsと一緒に起動")
+            self.startup_check.setChecked(is_startup_enabled())
+            self.startup_check.toggled.connect(self._on_startup_changed)
+            startup_layout.addWidget(self.startup_check)
+            
+            startup_layout.addStretch()
+            
+            layout.addLayout(startup_layout)
         
         # Hotkey settings
         hotkey_layout = QHBoxLayout()
@@ -616,6 +640,33 @@ class MainWindow(QMainWindow):
         """Update mute indicator."""
         self.mute_indicator.setText("🔇" if is_muted else "🔊")
     
+    def _on_auto_type_changed(self, checked: bool):
+        """Handle auto-type checkbox change."""
+        self._auto_type = checked
+        self.user_config.update(auto_type=checked)
+    
+    def _on_ai_process_changed(self, checked: bool):
+        """Handle AI process checkbox change."""
+        self._process_with_ai = checked
+        self.user_config.update(process_with_ai=checked)
+    
+    def _on_startup_changed(self, checked: bool):
+        """Handle Windows startup checkbox change."""
+        success = set_startup_enabled(checked)
+        if not success:
+            # Revert checkbox if failed
+            self.startup_check.blockSignals(True)
+            self.startup_check.setChecked(not checked)
+            self.startup_check.blockSignals(False)
+            self.tray_icon.showMessage(
+                "Chotto Voice",
+                "スタートアップ設定に失敗しました",
+                QSystemTrayIcon.MessageIcon.Warning,
+                2000
+            )
+        else:
+            self.user_config.update(start_with_windows=checked)
+    
     def _open_hotkey_settings(self):
         """Open hotkey settings dialog."""
         # Temporarily disable hotkey listening
@@ -628,6 +679,8 @@ class MainWindow(QMainWindow):
                 self.hotkey_config.key = new_hotkey
                 self.hotkey_manager.update_hotkey(new_hotkey)
                 self.hotkey_label.setText(f"⌨️ ホットキー: {new_hotkey}")
+                # Save to persistent config
+                self.user_config.update(hotkey=new_hotkey)
         
         # Re-enable hotkey listening
         self.hotkey_manager.start()

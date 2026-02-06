@@ -8,6 +8,7 @@ from src.audio import AudioRecorder
 from src.transcriber import create_transcriber
 from src.ai_client import create_ai_client
 from src.hotkey import HotkeyConfig
+from src.user_config import UserConfig
 from src.ui.main_window import MainWindow
 
 
@@ -15,6 +16,9 @@ def main():
     """Main entry point."""
     # Load settings
     settings = get_settings()
+    
+    # Load persistent user config
+    user_config = UserConfig.load()
     
     # Create components
     recorder = AudioRecorder(
@@ -53,21 +57,21 @@ def main():
     except Exception as e:
         print(f"Warning: AI client error: {e}")
     
-    # Create hotkey config
+    # Create hotkey config from user config (persistent settings)
     hotkey_config = HotkeyConfig(
-        key=settings.hotkey,
-        double_tap_threshold=settings.hotkey_double_tap_threshold,
-        hold_threshold=settings.hotkey_hold_threshold
+        key=user_config.hotkey,
+        double_tap_threshold=user_config.hotkey_double_tap_threshold,
+        hold_threshold=user_config.hotkey_hold_threshold
     )
     
     # Create and run application
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)  # Keep running in tray
     
-    window = MainWindow(recorder, transcriber, ai_client, hotkey_config)
+    window = MainWindow(recorder, transcriber, ai_client, hotkey_config, user_config)
     
     # Start minimized to tray by default
-    if settings.start_minimized:
+    if user_config.start_minimized:
         # Just don't show the window
         pass
     else:

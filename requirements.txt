@@ -28,5 +28,8 @@ pyperclip>=1.8.2
 pycaw>=20230407; sys_platform == "win32"
 comtypes>=1.2.0; sys_platform == "win32"
 
+# Startup shortcut (Windows)
+pywin32>=306; sys_platform == "win32"
+
 # Build/Package
 pyinstaller>=6.0.0
