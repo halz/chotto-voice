@@ -299,6 +299,12 @@ class MainWindow(QMainWindow):
         
         # Start hotkey listening
         self.hotkey_manager.start()
+        
+        # Show warning if transcriber is not available
+        if self.transcriber is None:
+            self.status_label.setText("⚠️ 音声認識が利用不可（OpenAI APIキーを確認）")
+            self.status_label.setStyleSheet("color: orange;")
+            self.record_btn.setEnabled(False)
     
     def _setup_ui(self):
         """Setup the user interface (Settings window)."""
@@ -475,6 +481,12 @@ class MainWindow(QMainWindow):
     
     def _start_recording(self):
         """Start recording."""
+        # Check if transcriber is available
+        if self.transcriber is None:
+            self.status_label.setText("❌ 音声認識が設定されていません（APIキーを確認）")
+            self.status_label.setStyleSheet("color: red;")
+            return
+        
         self.recorder.on_audio_level = self._update_audio_level
         self.recorder.start_recording()
         
