@@ -22,7 +22,8 @@ env/
 build/
 dist/
 *.egg-info/
-*.spec
+# Keep build.spec but ignore others
+!build.spec
 
 # OS
 .DS_Store
