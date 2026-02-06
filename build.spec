@@ -8,7 +8,7 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-        ('.env', '.'),  # Include .env if exists
+        # .env no longer needed - API keys configured via UI
     ],
     hiddenimports=[
         'PyQt6.QtCore',
