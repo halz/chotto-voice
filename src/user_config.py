@@ -103,7 +103,19 @@ def get_shortcut_path() -> Optional[Path]:
 def is_startup_enabled() -> bool:
     """Check if Windows startup is enabled."""
     shortcut = get_shortcut_path()
-    return shortcut.exists() if shortcut else False
+    if not shortcut:
+        return False
+    
+    # Check for .lnk shortcut
+    if shortcut.exists():
+        return True
+    
+    # Check for .bat fallback
+    bat_path = shortcut.with_suffix(".bat")
+    if bat_path.exists():
+        return True
+    
+    return False
 
 
 def enable_startup(exe_path: Optional[str] = None) -> bool:
