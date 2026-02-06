@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QTextEdit, QLabel, QProgressBar,
     QSystemTrayIcon, QMenu, QComboBox, QGroupBox,
     QDialog, QFormLayout, QLineEdit, QDialogButtonBox,
-    QCheckBox
+    QCheckBox, QMessageBox
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QIcon, QAction, QCloseEvent, QKeyEvent
@@ -309,7 +309,7 @@ class MainWindow(QMainWindow):
     def _setup_ui(self):
         """Setup the user interface (Settings window)."""
         self.setWindowTitle("Chotto Voice - 設定")
-        self.setMinimumSize(450, 350)
+        self.setMinimumSize(450, 500)
         self.setWindowFlags(
             Qt.WindowType.Window |
             Qt.WindowType.WindowCloseButtonHint |
@@ -402,6 +402,33 @@ class MainWindow(QMainWindow):
             startup_layout.addStretch()
             
             layout.addLayout(startup_layout)
+        
+        # API Keys section
+        api_group = QGroupBox("APIキー設定")
+        api_layout = QFormLayout(api_group)
+        
+        # OpenAI API Key
+        self.openai_key_input = QLineEdit()
+        self.openai_key_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.openai_key_input.setPlaceholderText("sk-...")
+        if self.user_config.openai_api_key:
+            self.openai_key_input.setText(self.user_config.openai_api_key)
+        api_layout.addRow("OpenAI:", self.openai_key_input)
+        
+        # Anthropic API Key
+        self.anthropic_key_input = QLineEdit()
+        self.anthropic_key_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.anthropic_key_input.setPlaceholderText("sk-ant-...")
+        if self.user_config.anthropic_api_key:
+            self.anthropic_key_input.setText(self.user_config.anthropic_api_key)
+        api_layout.addRow("Anthropic:", self.anthropic_key_input)
+        
+        # Save button
+        save_keys_btn = QPushButton("💾 APIキー保存")
+        save_keys_btn.clicked.connect(self._save_api_keys)
+        api_layout.addRow(save_keys_btn)
+        
+        layout.addWidget(api_group)
         
         # Hotkey settings
         hotkey_layout = QHBoxLayout()
@@ -651,6 +678,54 @@ class MainWindow(QMainWindow):
     def _update_mute_status(self, is_muted: bool):
         """Update mute indicator."""
         self.mute_indicator.setText("🔇" if is_muted else "🔊")
+    
+    def _save_api_keys(self):
+        """Save API keys and reinitialize clients."""
+        openai_key = self.openai_key_input.text().strip()
+        anthropic_key = self.anthropic_key_input.text().strip()
+        
+        # Save to config
+        self.user_config.update(
+            openai_api_key=openai_key,
+            anthropic_api_key=anthropic_key
+        )
+        
+        # Reinitialize transcriber if OpenAI key provided
+        if openai_key:
+            try:
+                from ..transcriber import create_transcriber
+                self.transcriber = create_transcriber(
+                    provider="openai_api",
+                    api_key=openai_key,
+                    model="whisper-1"
+                )
+                self.record_btn.setEnabled(True)
+                self.status_label.setText("✅ APIキー保存完了")
+                self.status_label.setStyleSheet("color: green;")
+            except Exception as e:
+                self.status_label.setText(f"❌ Transcriber初期化エラー: {e}")
+                self.status_label.setStyleSheet("color: red;")
+        
+        # Reinitialize AI client if Anthropic key provided
+        if anthropic_key:
+            try:
+                from ..ai_client import create_ai_client
+                self.ai_client = create_ai_client(
+                    provider="claude",
+                    api_key=anthropic_key,
+                    model="claude-sonnet-4-20250514"
+                )
+                self.ai_process_check.setEnabled(True)
+            except Exception as e:
+                print(f"AI client error: {e}")
+        
+        # Show notification
+        self.tray_icon.showMessage(
+            "Chotto Voice",
+            "APIキーを保存しました。",
+            QSystemTrayIcon.MessageIcon.Information,
+            2000
+        )
     
     def _on_auto_type_changed(self, checked: bool):
         """Handle auto-type checkbox change."""

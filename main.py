@@ -26,15 +26,20 @@ def main():
         channels=settings.channels
     )
     
+    # Get API keys (user_config takes priority over .env)
+    openai_key = user_config.openai_api_key or settings.openai_api_key
+    anthropic_key = user_config.anthropic_api_key or settings.anthropic_api_key
+    
     # Create transcriber
     transcriber = None
     try:
-        transcriber = create_transcriber(
-            provider=settings.whisper_provider,
-            api_key=settings.openai_api_key,
-            model=settings.whisper_model if settings.whisper_provider == "openai_api" 
-                  else settings.whisper_local_model
-        )
+        if openai_key:
+            transcriber = create_transcriber(
+                provider=settings.whisper_provider,
+                api_key=openai_key,
+                model=settings.whisper_model if settings.whisper_provider == "openai_api" 
+                      else settings.whisper_local_model
+            )
     except ValueError as e:
         print(f"Warning: {e}")
         print("音声認識が利用できません。設定でAPIキーを確認してください。")
@@ -42,16 +47,16 @@ def main():
     # Create AI client
     ai_client = None
     try:
-        if settings.ai_provider == "claude" and settings.anthropic_api_key:
+        if settings.ai_provider == "claude" and anthropic_key:
             ai_client = create_ai_client(
                 provider="claude",
-                api_key=settings.anthropic_api_key,
+                api_key=anthropic_key,
                 model=settings.claude_model
             )
-        elif settings.ai_provider == "openai" and settings.openai_api_key:
+        elif settings.ai_provider == "openai" and openai_key:
             ai_client = create_ai_client(
                 provider="openai",
-                api_key=settings.openai_api_key,
+                api_key=openai_key,
                 model=settings.openai_model
             )
     except Exception as e:

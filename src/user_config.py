@@ -36,6 +36,10 @@ def get_config_path() -> Path:
 class UserConfig:
     """User-configurable settings that persist across sessions."""
     
+    # API Keys (stored in user config, not .env)
+    openai_api_key: str = ""
+    anthropic_api_key: str = ""
+    
     # Hotkey settings
     hotkey: str = "ctrl+shift+space"
     hotkey_double_tap_threshold: float = 0.3
