@@ -67,13 +67,24 @@ class HotkeyManager:
         self._modifier_press_time = 0
         self._modifier_tap_threshold = 0.3  # seconds
         
+        # Normalize key for matching (handle ctrl/control variants)
+        def normalize_key(k: str) -> str:
+            """Normalize key name for comparison."""
+            k = k.lower().replace("_", " ")
+            # Normalize ctrl <-> control
+            k = k.replace("control", "ctrl")
+            return k
+        
+        target_key = normalize_key(key)
+        
         def on_press(event):
-            if event.name == key or event.name == key.replace(" ", "_"):
+            event_key = normalize_key(event.name)
+            if event_key == target_key:
                 self._modifier_press_time = time.time()
         
         def on_release(event):
-            key_name = event.name.lower().replace("_", " ")
-            if key_name == key or event.name.lower() == key.replace(" ", ""):
+            event_key = normalize_key(event.name)
+            if event_key == target_key:
                 # Check if it was a quick tap (not held for other purposes)
                 elapsed = time.time() - self._modifier_press_time
                 if 0.05 < elapsed < self._modifier_tap_threshold:
@@ -207,11 +218,17 @@ class HotkeyManager:
 HOTKEY_PRESETS = {
     "Ctrl+Shift+Space": "ctrl+shift+space",
     "右Alt (単体)": "right alt",
-    "右Shift (単体)": "right shift", 
+    "右Shift (単体)": "right shift",
+    "右Ctrl (単体)": "right ctrl",
     "F9": "f9",
     "Ctrl+Alt+V": "ctrl+alt+v",
-    "Ctrl+`": "ctrl+`",
 }
 
 # Single modifier keys that need special handling
-SINGLE_MODIFIER_KEYS = {"right alt", "left alt", "right shift", "left shift", "right ctrl", "left ctrl"}
+# Include both "ctrl" and "control" variants for compatibility
+SINGLE_MODIFIER_KEYS = {
+    "right alt", "left alt", 
+    "right shift", "left shift", 
+    "right ctrl", "left ctrl",
+    "right control", "left control",
+}
