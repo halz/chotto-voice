@@ -587,7 +587,7 @@ class MainWindow(QMainWindow):
             font-size: 13px;
             color: #212529;
         }
-        QLineEdit, QComboBox {
+        QLineEdit {
             padding: 8px 12px;
             border: 1px solid #dee2e6;
             border-radius: 6px;
@@ -596,17 +596,35 @@ class MainWindow(QMainWindow):
             min-height: 18px;
             color: #212529;
         }
-        QLineEdit:focus, QComboBox:focus {
-            border-color: #4dabf7;
+        QLineEdit:focus {
+            border-color: #74c0fc;
+            outline: none;
+        }
+        QComboBox {
+            padding: 8px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            background: #ffffff;
+            font-size: 13px;
+            min-height: 18px;
+            color: #212529;
+        }
+        QComboBox:focus {
+            border-color: #74c0fc;
         }
         QComboBox::drop-down {
             border: none;
-            padding-right: 8px;
+            width: 20px;
+        }
+        QComboBox::down-arrow {
+            image: none;
+            border: none;
         }
         QComboBox QAbstractItemView {
             background: white;
             border: 1px solid #dee2e6;
             selection-background-color: #e7f1ff;
+            outline: none;
         }
         QTextEdit {
             border: 1px solid #dee2e6;
@@ -618,18 +636,18 @@ class MainWindow(QMainWindow):
         QCheckBox {
             font-size: 13px;
             color: #212529;
-            spacing: 8px;
+            spacing: 10px;
+            padding: 4px 0;
         }
         QCheckBox::indicator {
-            width: 18px;
-            height: 18px;
-            border-radius: 4px;
-            border: 1px solid #ced4da;
-            background: white;
+            width: 40px;
+            height: 22px;
+            border-radius: 11px;
+            border: none;
+            background: #ced4da;
         }
         QCheckBox::indicator:checked {
             background: #228be6;
-            border-color: #228be6;
         }
         QPushButton#primary {
             background-color: #228be6;
@@ -761,9 +779,9 @@ class MainWindow(QMainWindow):
         
         # Navigation list
         self.nav_list = QListWidget()
-        self.nav_list.addItem("⚙️  設定")
-        self.nav_list.addItem("🎤  音声認識")
-        self.nav_list.addItem("🔑  APIキー")
+        self.nav_list.addItem("設定")
+        self.nav_list.addItem("音声認識")
+        self.nav_list.addItem("APIキー")
         self.nav_list.setCurrentRow(0)
         self.nav_list.currentRowChanged.connect(self._on_nav_changed)
         sidebar_layout.addWidget(self.nav_list)
