@@ -36,8 +36,9 @@ class Settings(BaseSettings):
     allowed_origins: list[str] = ["http://localhost", "https://chotto.voice"]
     
     class Config:
-        env_file = ".env"
+        env_file = "server/.env"
         env_file_encoding = "utf-8"
+        extra = "ignore"  # Ignore extra fields from parent .env
 
 
 @lru_cache
