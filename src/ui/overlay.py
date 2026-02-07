@@ -261,8 +261,10 @@ class OverlayIndicator(QWidget):
             return
         
         self._state = state
+        target_w = self.IDLE_WIDTH if state == "idle" else self.RECORDING_WIDTH
+        target_h = self.IDLE_HEIGHT if state == "idle" else self.RECORDING_HEIGHT
+        print(f"[Overlay] Target size: {target_w}x{target_h}", flush=True)
         self._update_size()
-        print(f"[Overlay] New size: {self._current_width}x{self._current_height}", flush=True)
         
         if state == "recording":
             self._recording_start_time = time.time()
