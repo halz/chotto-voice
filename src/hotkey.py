@@ -76,10 +76,12 @@ class HotkeyManager:
     def _setup_single_modifier_hotkey(self, key: str):
         """Setup hotkey for single modifier keys like right shift."""
         # For single modifier keys, we detect press and release
-        # and trigger on quick press-release (tap)
+        # Double tap to start, single tap to stop
         self._modifier_press_time = 0
-        self._modifier_tap_threshold = 0.5  # seconds (increased for easier detection)
+        self._modifier_tap_threshold = 0.5  # seconds for valid tap
         self._modifier_is_pressed = False
+        self._last_tap_time = 0
+        self._double_tap_threshold = 0.4  # seconds between taps for double-tap
         
         # Normalize key for matching (handle ctrl/control variants)
         def normalize_key(k: str) -> str:
@@ -106,9 +108,24 @@ class HotkeyManager:
                         self._modifier_is_pressed = False
                         elapsed = time.time() - self._modifier_press_time
                         debug_print(f"[Hotkey] Release detected: '{event_key}', elapsed: {elapsed:.3f}s")
+                        
+                        # Check if it was a valid tap (not too short, not too long)
                         if 0.05 < elapsed < self._modifier_tap_threshold:
-                            debug_print(f"[Hotkey] Triggering hotkey!")
-                            self._on_hotkey_pressed()
+                            current_time = time.time()
+                            time_since_last_tap = current_time - self._last_tap_time
+                            
+                            if self._is_recording:
+                                # If recording, single tap stops it
+                                debug_print(f"[Hotkey] Single tap - stopping recording")
+                                self._stop_recording()
+                            elif time_since_last_tap < self._double_tap_threshold:
+                                # Double tap detected - start recording
+                                debug_print(f"[Hotkey] Double tap detected - starting recording")
+                                self._start_recording()
+                            else:
+                                debug_print(f"[Hotkey] Single tap (waiting for double tap)")
+                            
+                            self._last_tap_time = current_time
         
         keyboard.hook(on_event)
     
