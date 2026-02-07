@@ -76,6 +76,7 @@ class HotkeyManager:
         # and trigger on quick press-release (tap)
         self._modifier_press_time = 0
         self._modifier_tap_threshold = 0.5  # seconds (increased for easier detection)
+        self._modifier_is_pressed = False
         
         # Normalize key for matching (handle ctrl/control variants)
         def normalize_key(k: str) -> str:
@@ -88,25 +89,25 @@ class HotkeyManager:
         target_key = normalize_key(key)
         debug_print(f"[Hotkey] Setting up single modifier hotkey: '{target_key}'")
         
-        def on_press(event):
+        def on_event(event):
             event_key = normalize_key(event.name)
+            
             if event_key == target_key:
-                self._modifier_press_time = time.time()
-                debug_print(f"[Hotkey] Press detected: '{event_key}'")
+                if event.event_type == 'down':
+                    if not self._modifier_is_pressed:
+                        self._modifier_press_time = time.time()
+                        self._modifier_is_pressed = True
+                        debug_print(f"[Hotkey] Press detected: '{event_key}'")
+                elif event.event_type == 'up':
+                    if self._modifier_is_pressed:
+                        self._modifier_is_pressed = False
+                        elapsed = time.time() - self._modifier_press_time
+                        debug_print(f"[Hotkey] Release detected: '{event_key}', elapsed: {elapsed:.3f}s")
+                        if 0.05 < elapsed < self._modifier_tap_threshold:
+                            debug_print(f"[Hotkey] Triggering hotkey!")
+                            self._on_hotkey_pressed()
         
-        def on_release(event):
-            event_key = normalize_key(event.name)
-            debug_print(f"[Hotkey] Release event: '{event.name}' -> '{event_key}'")
-            if event_key == target_key:
-                # Check if it was a quick tap (not held for other purposes)
-                elapsed = time.time() - self._modifier_press_time
-                debug_print(f"[Hotkey] Release MATCHED: '{event_key}', elapsed: {elapsed:.3f}s")
-                if 0.05 < elapsed < self._modifier_tap_threshold:
-                    debug_print(f"[Hotkey] Triggering hotkey!")
-                    self._on_hotkey_pressed()
-        
-        keyboard.on_press(on_press)
-        keyboard.on_release(on_release)
+        keyboard.hook(on_event)
     
     def _setup_combo_hotkey(self, key: str):
         """Setup hotkey for key combinations."""
