@@ -1,2 +1,0 @@
-# Root requirements - points to server requirements
--r server/requirements.txt
