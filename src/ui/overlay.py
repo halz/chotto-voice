@@ -255,11 +255,14 @@ class OverlayIndicator(QWidget):
     
     def set_state(self, state: str):
         """Set indicator state: 'idle', 'recording', or 'processing'."""
+        print(f"[Overlay] set_state: {self._state} -> {state}", flush=True)
         if self._state == state:
+            print(f"[Overlay] State unchanged, skipping", flush=True)
             return
         
         self._state = state
         self._update_size()
+        print(f"[Overlay] New size: {self._current_width}x{self._current_height}", flush=True)
         
         if state == "recording":
             self._recording_start_time = time.time()
