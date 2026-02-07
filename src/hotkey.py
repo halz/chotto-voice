@@ -65,29 +65,33 @@ class HotkeyManager:
         # For single modifier keys, we detect press and release
         # and trigger on quick press-release (tap)
         self._modifier_press_time = 0
-        self._modifier_tap_threshold = 0.3  # seconds
+        self._modifier_tap_threshold = 0.5  # seconds (increased for easier detection)
         
         # Normalize key for matching (handle ctrl/control variants)
         def normalize_key(k: str) -> str:
             """Normalize key name for comparison."""
-            k = k.lower().replace("_", " ")
+            k = k.lower().strip().replace("_", " ")
             # Normalize ctrl <-> control
             k = k.replace("control", "ctrl")
             return k
         
         target_key = normalize_key(key)
+        print(f"[Hotkey] Setting up single modifier hotkey: '{target_key}'")
         
         def on_press(event):
             event_key = normalize_key(event.name)
             if event_key == target_key:
                 self._modifier_press_time = time.time()
+                print(f"[Hotkey] Press detected: '{event_key}'")
         
         def on_release(event):
             event_key = normalize_key(event.name)
             if event_key == target_key:
                 # Check if it was a quick tap (not held for other purposes)
                 elapsed = time.time() - self._modifier_press_time
+                print(f"[Hotkey] Release detected: '{event_key}', elapsed: {elapsed:.3f}s")
                 if 0.05 < elapsed < self._modifier_tap_threshold:
+                    print(f"[Hotkey] Triggering hotkey!")
                     self._on_hotkey_pressed()
         
         keyboard.on_press(on_press)
