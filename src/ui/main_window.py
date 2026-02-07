@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QTextEdit, QLabel, QProgressBar,
     QSystemTrayIcon, QMenu, QComboBox, QGroupBox,
     QDialog, QFormLayout, QLineEdit, QDialogButtonBox,
-    QCheckBox, QMessageBox
+    QCheckBox, QMessageBox, QFrame
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QIcon, QAction, QCloseEvent, QKeyEvent
@@ -529,6 +529,124 @@ class TranscriptionWorker(QThread):
 class MainWindow(QMainWindow):
     """Main application window."""
     
+    STYLE = """
+        QMainWindow, QWidget#central {
+            background-color: #fafafa;
+        }
+        QLabel {
+            color: #333;
+        }
+        QLabel#title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+        QLabel#section {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1a1a1a;
+            padding-top: 12px;
+        }
+        QLabel#hint {
+            font-size: 12px;
+            color: #888;
+        }
+        QLineEdit, QComboBox {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: white;
+            font-size: 13px;
+            min-height: 20px;
+        }
+        QLineEdit:focus, QComboBox:focus {
+            border-color: #4A90D9;
+        }
+        QComboBox::drop-down {
+            border: none;
+            padding-right: 8px;
+        }
+        QTextEdit {
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: white;
+            font-size: 13px;
+            padding: 8px;
+        }
+        QCheckBox {
+            font-size: 13px;
+            color: #333;
+            spacing: 8px;
+        }
+        QCheckBox::indicator {
+            width: 18px;
+            height: 18px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            background: white;
+        }
+        QCheckBox::indicator:checked {
+            background: #2563eb;
+            border-color: #2563eb;
+        }
+        QPushButton#record {
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 16px;
+            font-size: 15px;
+            font-weight: 600;
+        }
+        QPushButton#record:hover {
+            background-color: #1d4ed8;
+        }
+        QPushButton#record:pressed {
+            background-color: #1e40af;
+        }
+        QPushButton#record[recording="true"] {
+            background-color: #dc2626;
+        }
+        QPushButton#record[recording="true"]:hover {
+            background-color: #b91c1c;
+        }
+        QPushButton#save {
+            background-color: #f3f4f6;
+            color: #374151;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+        QPushButton#save:hover {
+            background-color: #e5e7eb;
+        }
+        QPushButton#settings {
+            background: transparent;
+            border: none;
+            padding: 4px;
+            font-size: 16px;
+        }
+        QPushButton#settings:hover {
+            background-color: #e5e7eb;
+            border-radius: 4px;
+        }
+        QProgressBar {
+            border: none;
+            background: #e5e7eb;
+            border-radius: 2px;
+            max-height: 4px;
+        }
+        QProgressBar::chunk {
+            background: #2563eb;
+            border-radius: 2px;
+        }
+        QFrame#separator {
+            background-color: #e5e7eb;
+            max-height: 1px;
+        }
+    """
+    
     # Signals for thread-safe UI updates
     _start_recording_signal = pyqtSignal()
     _stop_recording_signal = pyqtSignal()
@@ -593,8 +711,9 @@ class MainWindow(QMainWindow):
     
     def _setup_ui(self):
         """Setup the user interface (Settings window)."""
-        self.setWindowTitle("Chotto Voice - 設定")
-        self.setMinimumSize(450, 500)
+        self.setWindowTitle("Chotto Voice")
+        self.setFixedSize(420, 620)
+        self.setStyleSheet(self.STYLE)
         self.setWindowFlags(
             Qt.WindowType.Window |
             Qt.WindowType.WindowCloseButtonHint |
@@ -603,200 +722,192 @@ class MainWindow(QMainWindow):
         
         # Central widget
         central = QWidget()
+        central.setObjectName("central")
         self.setCentralWidget(central)
         layout = QVBoxLayout(central)
+        layout.setSpacing(8)
+        layout.setContentsMargins(24, 20, 24, 20)
         
-        # Recording section
-        record_group = QGroupBox("録音")
-        record_layout = QVBoxLayout(record_group)
+        # Title
+        title = QLabel("Chotto Voice")
+        title.setObjectName("title")
+        layout.addWidget(title)
+        
+        # Status
+        self.status_label = QLabel("準備完了")
+        self.status_label.setObjectName("hint")
+        layout.addWidget(self.status_label)
+        
+        layout.addSpacing(8)
         
         # Record button
-        self.record_btn = QPushButton("🎤 録音開始")
-        self.record_btn.setMinimumHeight(80)
-        self.record_btn.setStyleSheet("""
-            QPushButton {
-                font-size: 24px;
-                background-color: #4CAF50;
-                color: white;
-                border-radius: 15px;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-            QPushButton:pressed {
-                background-color: #3d8b40;
-            }
-            QPushButton:disabled {
-                background-color: #cccccc;
-            }
-        """)
+        self.record_btn = QPushButton("録音開始")
+        self.record_btn.setObjectName("record")
+        self.record_btn.setMinimumHeight(50)
+        self.record_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.record_btn.clicked.connect(self._toggle_recording)
-        record_layout.addWidget(self.record_btn)
+        layout.addWidget(self.record_btn)
         
-        # Audio level indicator
+        # Audio level
         self.level_bar = QProgressBar()
         self.level_bar.setMaximum(100)
         self.level_bar.setTextVisible(False)
-        self.level_bar.setMaximumHeight(8)
-        record_layout.addWidget(self.level_bar)
+        layout.addWidget(self.level_bar)
         
-        # Status label
-        self.status_label = QLabel("準備完了")
-        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.status_label.setStyleSheet("color: gray;")
-        record_layout.addWidget(self.status_label)
+        layout.addSpacing(4)
         
-        layout.addWidget(record_group)
-        
-        # Result display (simplified)
-        result_group = QGroupBox("結果")
-        result_layout = QVBoxLayout(result_group)
-        
+        # Result
         self.result_text = QTextEdit()
         self.result_text.setPlaceholderText("音声認識の結果がここに表示されます...")
-        self.result_text.setMaximumHeight(120)
-        result_layout.addWidget(self.result_text)
+        self.result_text.setMaximumHeight(80)
+        layout.addWidget(self.result_text)
         
-        layout.addWidget(result_group)
+        # Separator
+        sep1 = QFrame()
+        sep1.setObjectName("separator")
+        sep1.setFrameShape(QFrame.Shape.HLine)
+        layout.addWidget(sep1)
+        
+        # Settings section
+        settings_label = QLabel("設定")
+        settings_label.setObjectName("section")
+        layout.addWidget(settings_label)
+        
+        # Whisper provider
+        whisper_row = QHBoxLayout()
+        whisper_row.addWidget(QLabel("音声認識"))
+        whisper_row.addStretch()
+        self.whisper_provider_combo = QComboBox()
+        self.whisper_provider_combo.addItem("ローカル", "local")
+        self.whisper_provider_combo.addItem("OpenAI API", "api")
+        self.whisper_provider_combo.setFixedWidth(140)
+        current_provider = self.user_config.whisper_provider
+        self.whisper_provider_combo.setCurrentIndex(0 if current_provider == "local" else 1)
+        self.whisper_provider_combo.currentIndexChanged.connect(self._on_whisper_provider_changed)
+        whisper_row.addWidget(self.whisper_provider_combo)
+        layout.addLayout(whisper_row)
+        
+        # Model selection
+        model_row = QHBoxLayout()
+        model_row.addWidget(QLabel("モデル"))
+        model_row.addStretch()
+        self.whisper_model_combo = QComboBox()
+        self.whisper_model_combo.addItem("tiny", "tiny")
+        self.whisper_model_combo.addItem("base", "base")
+        self.whisper_model_combo.addItem("small", "small")
+        self.whisper_model_combo.setFixedWidth(140)
+        model_map = {"tiny": 0, "base": 1, "small": 2}
+        self.whisper_model_combo.setCurrentIndex(model_map.get(self.user_config.whisper_local_model, 2))
+        self.whisper_model_combo.setEnabled(current_provider == "local")
+        self.whisper_model_combo.currentIndexChanged.connect(self._on_whisper_model_changed)
+        model_row.addWidget(self.whisper_model_combo)
+        layout.addLayout(model_row)
         
         # Options
-        options_layout = QHBoxLayout()
+        layout.addSpacing(8)
         
         self.auto_type_check = QCheckBox("フォーカス中のフィールドに入力")
         self.auto_type_check.setChecked(self._auto_type)
         self.auto_type_check.toggled.connect(self._on_auto_type_changed)
-        options_layout.addWidget(self.auto_type_check)
+        layout.addWidget(self.auto_type_check)
         
-        self.ai_process_check = QCheckBox("AIで整形")
+        self.ai_process_check = QCheckBox("AIで文章を整形")
         self.ai_process_check.setChecked(self._process_with_ai)
         self.ai_process_check.setEnabled(self.ai_client is not None)
         self.ai_process_check.toggled.connect(self._on_ai_process_changed)
-        options_layout.addWidget(self.ai_process_check)
+        layout.addWidget(self.ai_process_check)
         
-        layout.addLayout(options_layout)
-        
-        # Startup options (Windows only)
         if sys.platform == "win32":
-            startup_layout = QHBoxLayout()
-            
             self.startup_check = QCheckBox("Windowsと一緒に起動")
             self.startup_check.setChecked(is_startup_enabled())
             self.startup_check.toggled.connect(self._on_startup_changed)
-            startup_layout.addWidget(self.startup_check)
-            
-            startup_layout.addStretch()
-            
-            layout.addLayout(startup_layout)
+            layout.addWidget(self.startup_check)
         
-        # Overlay position setting
-        overlay_layout = QHBoxLayout()
-        overlay_layout.addWidget(QLabel("インジケーター位置:"))
-        
+        # Overlay position
+        overlay_row = QHBoxLayout()
+        overlay_row.addWidget(QLabel("インジケーター"))
+        overlay_row.addStretch()
         from .overlay import OVERLAY_POSITIONS
         self.overlay_position_combo = QComboBox()
         for key, label in OVERLAY_POSITIONS.items():
             self.overlay_position_combo.addItem(label, key)
-        
-        # Set current value
+        self.overlay_position_combo.setFixedWidth(140)
         current_pos = self.user_config.overlay_position
         for i in range(self.overlay_position_combo.count()):
             if self.overlay_position_combo.itemData(i) == current_pos:
                 self.overlay_position_combo.setCurrentIndex(i)
                 break
-        
         self.overlay_position_combo.currentIndexChanged.connect(self._on_overlay_position_changed)
-        overlay_layout.addWidget(self.overlay_position_combo)
-        overlay_layout.addStretch()
+        overlay_row.addWidget(self.overlay_position_combo)
+        layout.addLayout(overlay_row)
         
-        layout.addLayout(overlay_layout)
+        # Hotkey
+        hotkey_row = QHBoxLayout()
+        self.hotkey_label = QLabel(f"ホットキー: {self.hotkey_config.key}")
+        hotkey_row.addWidget(self.hotkey_label)
+        hotkey_row.addStretch()
+        self.mute_indicator = QLabel("🔊")
+        hotkey_row.addWidget(self.mute_indicator)
+        self.hotkey_btn = QPushButton("変更")
+        self.hotkey_btn.setObjectName("save")
+        self.hotkey_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.hotkey_btn.clicked.connect(self._open_hotkey_settings)
+        hotkey_row.addWidget(self.hotkey_btn)
+        layout.addLayout(hotkey_row)
         
-        # Whisper settings section
-        whisper_group = QGroupBox("音声認識設定")
-        whisper_layout = QFormLayout(whisper_group)
-        
-        # Provider selection
-        self.whisper_provider_combo = QComboBox()
-        self.whisper_provider_combo.addItem("🆓 ローカル (無料・オフライン)", "local")
-        self.whisper_provider_combo.addItem("☁️ OpenAI API (高速・高精度)", "api")
-        
-        # Set current value
-        current_provider = self.user_config.whisper_provider
-        index = 0 if current_provider == "local" else 1
-        self.whisper_provider_combo.setCurrentIndex(index)
-        self.whisper_provider_combo.currentIndexChanged.connect(self._on_whisper_provider_changed)
-        whisper_layout.addRow("Whisper:", self.whisper_provider_combo)
-        
-        # Local model selection
-        self.whisper_model_combo = QComboBox()
-        self.whisper_model_combo.addItem("tiny (最速・39MB)", "tiny")
-        self.whisper_model_combo.addItem("base (バランス・74MB)", "base")
-        self.whisper_model_combo.addItem("small (高精度・244MB)", "small")
-        
-        # Set current model
-        current_model = self.user_config.whisper_local_model
-        model_map = {"tiny": 0, "base": 1, "small": 2}
-        self.whisper_model_combo.setCurrentIndex(model_map.get(current_model, 1))
-        self.whisper_model_combo.currentIndexChanged.connect(self._on_whisper_model_changed)
-        whisper_layout.addRow("モデル:", self.whisper_model_combo)
-        
-        # Enable/disable model combo based on provider
-        self.whisper_model_combo.setEnabled(current_provider == "local")
-        
-        layout.addWidget(whisper_group)
+        # Separator
+        sep2 = QFrame()
+        sep2.setObjectName("separator")
+        sep2.setFrameShape(QFrame.Shape.HLine)
+        layout.addWidget(sep2)
         
         # API Keys section
-        api_group = QGroupBox("APIキー設定")
-        api_layout = QFormLayout(api_group)
+        api_label = QLabel("APIキー")
+        api_label.setObjectName("section")
+        layout.addWidget(api_label)
         
-        # OpenAI API Key
-        self.openai_key_input = QLineEdit()
-        self.openai_key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.openai_key_input.setPlaceholderText("sk-...")
-        if self.user_config.openai_api_key:
-            self.openai_key_input.setText(self.user_config.openai_api_key)
-        api_layout.addRow("OpenAI:", self.openai_key_input)
-        
-        # Anthropic API Key
-        self.anthropic_key_input = QLineEdit()
-        self.anthropic_key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.anthropic_key_input.setPlaceholderText("sk-ant-...")
-        if self.user_config.anthropic_api_key:
-            self.anthropic_key_input.setText(self.user_config.anthropic_api_key)
-        api_layout.addRow("Anthropic:", self.anthropic_key_input)
-        
-        # Google Gemini API Key
+        # Gemini
+        gemini_row = QHBoxLayout()
+        gemini_row.addWidget(QLabel("Gemini"))
         self.gemini_key_input = QLineEdit()
         self.gemini_key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.gemini_key_input.setPlaceholderText("AIza...")
+        self.gemini_key_input.setPlaceholderText("APIキー")
         if self.user_config.gemini_api_key:
             self.gemini_key_input.setText(self.user_config.gemini_api_key)
-        api_layout.addRow("Gemini:", self.gemini_key_input)
+        gemini_row.addWidget(self.gemini_key_input)
+        layout.addLayout(gemini_row)
+        
+        # OpenAI
+        openai_row = QHBoxLayout()
+        openai_row.addWidget(QLabel("OpenAI"))
+        self.openai_key_input = QLineEdit()
+        self.openai_key_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.openai_key_input.setPlaceholderText("APIキー")
+        if self.user_config.openai_api_key:
+            self.openai_key_input.setText(self.user_config.openai_api_key)
+        openai_row.addWidget(self.openai_key_input)
+        layout.addLayout(openai_row)
+        
+        # Anthropic
+        anthropic_row = QHBoxLayout()
+        anthropic_row.addWidget(QLabel("Anthropic"))
+        self.anthropic_key_input = QLineEdit()
+        self.anthropic_key_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.anthropic_key_input.setPlaceholderText("APIキー")
+        if self.user_config.anthropic_api_key:
+            self.anthropic_key_input.setText(self.user_config.anthropic_api_key)
+        anthropic_row.addWidget(self.anthropic_key_input)
+        layout.addLayout(anthropic_row)
         
         # Save button
-        save_keys_btn = QPushButton("💾 APIキー保存")
+        save_row = QHBoxLayout()
+        save_row.addStretch()
+        save_keys_btn = QPushButton("保存")
+        save_keys_btn.setObjectName("save")
+        save_keys_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         save_keys_btn.clicked.connect(self._save_api_keys)
-        api_layout.addRow(save_keys_btn)
-        
-        layout.addWidget(api_group)
-        
-        # Hotkey settings
-        hotkey_layout = QHBoxLayout()
-        
-        self.hotkey_label = QLabel(f"⌨️ ホットキー: {self.hotkey_config.key}")
-        hotkey_layout.addWidget(self.hotkey_label)
-        
-        hotkey_layout.addStretch()
-        
-        self.mute_indicator = QLabel("🔊")
-        self.mute_indicator.setStyleSheet("font-size: 18px;")
-        hotkey_layout.addWidget(self.mute_indicator)
-        
-        self.hotkey_btn = QPushButton("⚙️")
-        self.hotkey_btn.setMaximumWidth(40)
-        self.hotkey_btn.clicked.connect(self._open_hotkey_settings)
-        hotkey_layout.addWidget(self.hotkey_btn)
-        
-        layout.addLayout(hotkey_layout)
+        save_row.addWidget(save_keys_btn)
+        layout.addLayout(save_row)
     
     def _setup_overlay(self):
         """Setup the overlay indicator."""
