@@ -81,7 +81,7 @@ class HotkeyManager:
         self._modifier_tap_threshold = 0.5  # seconds for valid tap
         self._modifier_is_pressed = False
         self._last_tap_time = 0
-        self._double_tap_threshold = 0.4  # seconds between taps for double-tap
+        self._double_tap_threshold = 0.6  # seconds between taps for double-tap (wider window)
         
         # Normalize key for matching (handle ctrl/control variants)
         def normalize_key(k: str) -> str:
@@ -122,10 +122,10 @@ class HotkeyManager:
                                 self._stop_recording()
                             elif time_since_last_tap < self._double_tap_threshold:
                                 # Double tap detected - start recording
-                                debug_print(f"[Hotkey] Double tap detected - starting recording")
+                                debug_print(f"[Hotkey] Double tap detected (gap: {time_since_last_tap:.3f}s) - starting recording")
                                 self._start_recording()
                             else:
-                                debug_print(f"[Hotkey] Single tap (waiting for double tap)")
+                                debug_print(f"[Hotkey] Single tap (gap: {time_since_last_tap:.3f}s > {self._double_tap_threshold}s, waiting)")
                             
                             self._last_tap_time = current_time
         
