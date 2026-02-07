@@ -614,33 +614,63 @@ class MainWindow(QMainWindow):
         }
         QComboBox::drop-down {
             border: none;
-            width: 24px;
-            subcontrol-position: center right;
+            width: 30px;
+            subcontrol-position: right center;
+            subcontrol-origin: padding;
         }
         QComboBox::down-arrow {
-            width: 12px;
-            height: 12px;
-            border: none;
-            border-left: 2px solid #868e96;
-            border-bottom: 2px solid #868e96;
-            transform: rotate(-45deg);
+            width: 0;
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 6px solid #868e96;
+        }
+        QComboBox:disabled {
+            background: #f1f3f5;
+            color: #adb5bd;
+        }
+        QWidget#posGrid {
+            background: #1a1f2e;
+            border-radius: 12px;
+            border: 1px solid #2d3548;
         }
         QPushButton#posBtn {
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            background: #f8f9fa;
-            min-width: 32px;
-            min-height: 32px;
-            font-size: 10px;
-            color: #868e96;
+            border: 1px solid #3d4760;
+            border-radius: 8px;
+            background: #252d3d;
+            min-width: 80px;
+            min-height: 60px;
+            font-size: 11px;
+            color: #6c7a96;
         }
         QPushButton#posBtn:hover {
-            background: #e9ecef;
+            background: #2d3548;
+            border-color: #4a5875;
         }
         QPushButton#posBtn:checked {
-            background: #228be6;
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1a4d3e, stop:1 #0d2e24);
+            border: 2px solid #22c55e;
+            color: #22c55e;
+        }
+        QLabel#posStatus {
+            background: #252d3d;
+            border-radius: 20px;
+            padding: 8px 20px;
+            color: #6c7a96;
+            font-size: 13px;
+        }
+        QLineEdit#hotkeyInput {
+            padding: 10px 14px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            background: #ffffff;
+            font-size: 14px;
+            font-weight: 500;
+            color: #212529;
+        }
+        QLineEdit#hotkeyInput:focus {
             border-color: #228be6;
-            color: white;
+            background: #f8f9fa;
         }
         QComboBox QAbstractItemView {
             background-color: white;
@@ -893,28 +923,38 @@ class MainWindow(QMainWindow):
         overlay_label.setObjectName("sectionTitle")
         layout.addWidget(overlay_label)
         
+        pos_hint = QLabel("画面上の表示位置をクリックして選択")
+        pos_hint.setObjectName("hint")
+        layout.addWidget(pos_hint)
+        
+        layout.addSpacing(8)
+        
         # Create position grid
         from PyQt6.QtWidgets import QGridLayout, QButtonGroup
         pos_container = QWidget()
-        pos_container.setStyleSheet("background: #f1f3f5; border-radius: 8px; padding: 8px;")
-        pos_container.setFixedSize(120, 80)
+        pos_container.setObjectName("posGrid")
+        pos_container.setFixedSize(280, 160)
         pos_grid = QGridLayout(pos_container)
-        pos_grid.setSpacing(4)
-        pos_grid.setContentsMargins(8, 8, 8, 8)
+        pos_grid.setSpacing(8)
+        pos_grid.setContentsMargins(12, 12, 12, 12)
         
         self.pos_buttons = {}
         self.pos_button_group = QButtonGroup(self)
         positions = [
-            ("top-left", 0, 0), ("top-center", 0, 1), ("top-right", 0, 2),
-            ("bottom-left", 1, 0), ("bottom-center", 1, 1), ("bottom-right", 1, 2)
+            ("top-left", "🎤\n左上", 0, 0), 
+            ("top-center", "🎤\n上中央", 0, 1), 
+            ("top-right", "🎤\n右上", 0, 2),
+            ("bottom-left", "🎤\n左下", 1, 0), 
+            ("bottom-center", "🎤\n下中央", 1, 1), 
+            ("bottom-right", "🎤\n右下", 1, 2)
         ]
         
         current_pos = self.user_config.overlay_position
-        for pos_key, row, col in positions:
-            btn = QPushButton()
+        for pos_key, label, row, col in positions:
+            btn = QPushButton(label)
             btn.setObjectName("posBtn")
             btn.setCheckable(True)
-            btn.setFixedSize(32, 28)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
             if pos_key == current_pos:
                 btn.setChecked(True)
             btn.clicked.connect(lambda checked, k=pos_key: self._on_position_btn_clicked(k))
@@ -923,6 +963,12 @@ class MainWindow(QMainWindow):
             pos_grid.addWidget(btn, row, col)
         
         layout.addWidget(pos_container)
+        
+        # Status label
+        self.pos_status_label = QLabel(f"🎤 {self._get_pos_label(current_pos)} に配置中")
+        self.pos_status_label.setObjectName("posStatus")
+        self.pos_status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.pos_status_label)
         
         # Keep combo hidden for compatibility
         self.overlay_position_combo = QComboBox()
@@ -935,17 +981,23 @@ class MainWindow(QMainWindow):
         hotkey_label.setObjectName("sectionTitle")
         layout.addWidget(hotkey_label)
         
-        hotkey_row = QHBoxLayout()
-        self.hotkey_label = QLabel(self.hotkey_config.key)
-        self.hotkey_label.setObjectName("settingLabel")
-        hotkey_row.addWidget(self.hotkey_label)
-        hotkey_row.addStretch()
-        self.hotkey_btn = QPushButton("変更")
-        self.hotkey_btn.setObjectName("secondary")
-        self.hotkey_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.hotkey_btn.clicked.connect(self._open_hotkey_settings)
-        hotkey_row.addWidget(self.hotkey_btn)
-        layout.addLayout(hotkey_row)
+        hotkey_hint = QLabel("キーを押して設定（ダブルタップで録音開始）")
+        hotkey_hint.setObjectName("hint")
+        layout.addWidget(hotkey_hint)
+        
+        # Hotkey capture field (inline)
+        self.hotkey_input = HotkeyCapture()
+        self.hotkey_input.setObjectName("hotkeyInput")
+        self.hotkey_input.setText(self.hotkey_config.key)
+        self.hotkey_input.setFixedWidth(200)
+        self.hotkey_input.setPlaceholderText("クリックしてキーを押す")
+        self.hotkey_input.hotkey_captured.connect(self._on_inline_hotkey_captured)
+        layout.addWidget(self.hotkey_input)
+        
+        # Keep reference for compatibility
+        self.hotkey_label = self.hotkey_input
+        self.hotkey_btn = QPushButton()
+        self.hotkey_btn.hide()
         
         layout.addStretch()
         self.page_stack.addWidget(page)
@@ -1084,6 +1136,26 @@ class MainWindow(QMainWindow):
         """Handle position button click."""
         self.overlay.set_position(position)
         self.user_config.update(overlay_position=position)
+        self.pos_status_label.setText(f"🎤 {self._get_pos_label(position)} に配置中")
+    
+    def _get_pos_label(self, pos: str) -> str:
+        """Get Japanese label for position."""
+        labels = {
+            "top-left": "左上",
+            "top-center": "上中央", 
+            "top-right": "右上",
+            "bottom-left": "左下",
+            "bottom-center": "下中央",
+            "bottom-right": "右下"
+        }
+        return labels.get(pos, pos)
+    
+    def _on_inline_hotkey_captured(self, hotkey: str):
+        """Handle inline hotkey capture."""
+        if hotkey:
+            self.hotkey_config.key = hotkey
+            self.hotkey_manager.update_hotkey(hotkey)
+            self.user_config.update(hotkey=hotkey)
     
     def _setup_overlay(self):
         """Setup the overlay indicator."""
