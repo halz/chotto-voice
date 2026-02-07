@@ -50,12 +50,13 @@ class AudioController(ABC):
 
 
 class WindowsAudioController(AudioController):
-    """Audio controller for Windows using pycaw."""
+    """Audio controller for Windows using pycaw - per-app volume control."""
     
     def __init__(self):
         self._interface = None
-        self._saved_volume = 1.0  # Save volume before fade out
+        self._saved_volumes = {}  # {pid: volume} for each app
         self._fade_thread = None
+        self._use_per_app = True  # Use per-app volume (no OSD)
         self._init_audio()
     
     def _init_audio(self):
@@ -65,7 +66,7 @@ class WindowsAudioController(AudioController):
             from comtypes import CLSCTX_ALL
             from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
             
-            # Get default audio endpoint
+            # Get default audio endpoint for fallback
             devices = AudioUtilities.GetSpeakers()
             interface = devices.Activate(
                 IAudioEndpointVolume._iid_, CLSCTX_ALL, None
@@ -74,21 +75,21 @@ class WindowsAudioController(AudioController):
         except ImportError:
             print("pycaw not installed, audio control disabled")
             self._interface = None
-        except AttributeError:
-            # Try alternative method for newer pycaw versions
-            try:
-                from pycaw.pycaw import AudioUtilities, ISimpleAudioVolume
-                # Fall back to dummy controller
-                print("Using fallback audio controller")
-                self._interface = None
-            except:
-                self._interface = None
         except Exception as e:
             print(f"Failed to initialize Windows audio: {e}")
             self._interface = None
     
+    def _get_audio_sessions(self):
+        """Get all active audio sessions (playing apps)."""
+        try:
+            from pycaw.pycaw import AudioUtilities
+            sessions = AudioUtilities.GetAllSessions()
+            return [s for s in sessions if s.Process and s.Process.pid]
+        except Exception:
+            return []
+    
     def get_volume(self) -> float:
-        """Get current volume level (0.0 to 1.0)."""
+        """Get current system volume level (0.0 to 1.0)."""
         if not self._interface:
             return 1.0
         try:
@@ -97,7 +98,7 @@ class WindowsAudioController(AudioController):
             return 1.0
     
     def set_volume(self, level: float) -> bool:
-        """Set volume level (0.0 to 1.0)."""
+        """Set system volume level (0.0 to 1.0)."""
         if not self._interface:
             return False
         try:
@@ -107,29 +108,86 @@ class WindowsAudioController(AudioController):
         except Exception:
             return False
     
-    def fade_out(self, duration: float = 0.3) -> bool:
-        """Fade out system audio over duration seconds."""
-        if not self._interface:
-            return self.mute()
-        
+    def _set_all_app_volumes(self, level: float) -> bool:
+        """Set volume for all audio-playing apps (no OSD)."""
         try:
-            self._saved_volume = self.get_volume()
-            if self._saved_volume <= 0.01:
-                return True
+            sessions = self._get_audio_sessions()
+            for session in sessions:
+                try:
+                    volume = session._ctl.QueryInterface(
+                        __import__('pycaw.pycaw', fromlist=['ISimpleAudioVolume']).ISimpleAudioVolume
+                    )
+                    volume.SetMasterVolume(level, None)
+                except Exception:
+                    pass
+            return True
+        except Exception as e:
+            print(f"Per-app volume error: {e}")
+            return False
+    
+    def _save_app_volumes(self):
+        """Save current volume of all audio apps."""
+        self._saved_volumes = {}
+        try:
+            from pycaw.pycaw import ISimpleAudioVolume
+            sessions = self._get_audio_sessions()
+            for session in sessions:
+                try:
+                    volume = session._ctl.QueryInterface(ISimpleAudioVolume)
+                    self._saved_volumes[session.Process.pid] = volume.GetMasterVolume()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+    
+    def _restore_app_volumes(self):
+        """Restore saved volumes for all audio apps."""
+        try:
+            from pycaw.pycaw import ISimpleAudioVolume
+            sessions = self._get_audio_sessions()
+            for session in sessions:
+                try:
+                    pid = session.Process.pid
+                    if pid in self._saved_volumes:
+                        volume = session._ctl.QueryInterface(ISimpleAudioVolume)
+                        volume.SetMasterVolume(self._saved_volumes[pid], None)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+    
+    def fade_out(self, duration: float = 0.3) -> bool:
+        """Fade out audio over duration seconds (per-app, no OSD)."""
+        try:
+            self._save_app_volumes()
+            
+            if not self._saved_volumes:
+                return True  # No apps playing audio
             
             steps = 10
             step_duration = duration / steps
-            step_volume = self._saved_volume / steps
             
             def do_fade():
-                current = self._saved_volume
-                for _ in range(steps):
-                    current -= step_volume
-                    self.set_volume(max(0.0, current))
+                for i in range(steps):
+                    factor = 1.0 - ((i + 1) / steps)
+                    try:
+                        from pycaw.pycaw import ISimpleAudioVolume
+                        sessions = self._get_audio_sessions()
+                        for session in sessions:
+                            try:
+                                pid = session.Process.pid
+                                if pid in self._saved_volumes:
+                                    volume = session._ctl.QueryInterface(ISimpleAudioVolume)
+                                    volume.SetMasterVolume(self._saved_volumes[pid] * factor, None)
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
                     time.sleep(step_duration)
-                self.set_volume(0.0)
+                
+                # Set to 0 at the end
+                self._set_all_app_volumes(0.0)
             
-            # Run fade in background thread
             self._fade_thread = threading.Thread(target=do_fade, daemon=True)
             self._fade_thread.start()
             return True
@@ -138,26 +196,35 @@ class WindowsAudioController(AudioController):
             return self.mute()
     
     def fade_in(self, duration: float = 0.3) -> bool:
-        """Fade in system audio over duration seconds."""
-        if not self._interface:
-            return self.unmute()
-        
+        """Fade in audio over duration seconds (per-app, no OSD)."""
         try:
-            target_volume = self._saved_volume if self._saved_volume > 0.01 else 1.0
+            if not self._saved_volumes:
+                return True  # Nothing to restore
             
             steps = 10
             step_duration = duration / steps
-            step_volume = target_volume / steps
             
             def do_fade():
-                current = 0.0
-                for _ in range(steps):
-                    current += step_volume
-                    self.set_volume(min(target_volume, current))
+                for i in range(steps):
+                    factor = (i + 1) / steps
+                    try:
+                        from pycaw.pycaw import ISimpleAudioVolume
+                        sessions = self._get_audio_sessions()
+                        for session in sessions:
+                            try:
+                                pid = session.Process.pid
+                                if pid in self._saved_volumes:
+                                    volume = session._ctl.QueryInterface(ISimpleAudioVolume)
+                                    volume.SetMasterVolume(self._saved_volumes[pid] * factor, None)
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
                     time.sleep(step_duration)
-                self.set_volume(target_volume)
+                
+                # Restore original volumes
+                self._restore_app_volumes()
             
-            # Run fade in background thread
             self._fade_thread = threading.Thread(target=do_fade, daemon=True)
             self._fade_thread.start()
             return True
