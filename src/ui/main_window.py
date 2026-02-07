@@ -28,12 +28,45 @@ class HotkeyCapture(QLineEdit):
     
     hotkey_captured = pyqtSignal(str)
     
+    # Style constants for visibility
+    STYLE_NORMAL = """
+        QLineEdit {
+            background-color: #2d2d2d;
+            color: #ffffff;
+            border: 2px solid #555555;
+            border-radius: 4px;
+            padding: 6px;
+            font-size: 14px;
+        }
+    """
+    STYLE_CAPTURING = """
+        QLineEdit {
+            background-color: #3d3522;
+            color: #ffffff;
+            border: 2px solid #ffc107;
+            border-radius: 4px;
+            padding: 6px;
+            font-size: 14px;
+        }
+    """
+    STYLE_SUCCESS = """
+        QLineEdit {
+            background-color: #1e3d1e;
+            color: #ffffff;
+            border: 2px solid #28a745;
+            border-radius: 4px;
+            padding: 6px;
+            font-size: 14px;
+        }
+    """
+    
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setPlaceholderText("クリックしてキーを押す...")
         self.setReadOnly(True)
         self._capturing = False
         self._modifiers = set()
+        self.setStyleSheet(self.STYLE_NORMAL)
     
     def focusInEvent(self, event):
         """Start capturing when focused."""
@@ -41,14 +74,14 @@ class HotkeyCapture(QLineEdit):
         self._capturing = True
         self._modifiers = set()
         self.setText("")
-        self.setStyleSheet("background-color: #fff3cd; border: 2px solid #ffc107;")
+        self.setStyleSheet(self.STYLE_CAPTURING)
         self.setPlaceholderText("キーを押してください...")
     
     def focusOutEvent(self, event):
         """Stop capturing when focus lost."""
         super().focusOutEvent(event)
         self._capturing = False
-        self.setStyleSheet("")
+        self.setStyleSheet(self.STYLE_NORMAL)
         if not self.text():
             self.setPlaceholderText("クリックしてキーを押す...")
     
@@ -82,7 +115,7 @@ class HotkeyCapture(QLineEdit):
             self.setText(hotkey)
             self.hotkey_captured.emit(hotkey)
             self._capturing = False
-            self.setStyleSheet("background-color: #d4edda; border: 2px solid #28a745;")
+            self.setStyleSheet(self.STYLE_SUCCESS)
             self.clearFocus()
     
     def _get_key_name(self, key: int) -> str:
@@ -152,12 +185,23 @@ class HotkeySettingsDialog(QDialog):
         
         # Presets
         preset_group = QGroupBox("プリセット")
-        preset_layout = QHBoxLayout(preset_group)
+        preset_layout = QVBoxLayout(preset_group)
         
-        for name, key in list(HOTKEY_PRESETS.items())[:4]:
+        # First row
+        row1 = QHBoxLayout()
+        for name, key in list(HOTKEY_PRESETS.items())[:3]:
             btn = QPushButton(name)
             btn.clicked.connect(lambda checked, k=key: self._set_preset(k))
-            preset_layout.addWidget(btn)
+            row1.addWidget(btn)
+        preset_layout.addLayout(row1)
+        
+        # Second row
+        row2 = QHBoxLayout()
+        for name, key in list(HOTKEY_PRESETS.items())[3:]:
+            btn = QPushButton(name)
+            btn.clicked.connect(lambda checked, k=key: self._set_preset(k))
+            row2.addWidget(btn)
+        preset_layout.addLayout(row2)
         
         layout.addWidget(preset_group)
         
@@ -190,7 +234,7 @@ class HotkeySettingsDialog(QDialog):
         """Set a preset hotkey."""
         self.hotkey_input.setText(key)
         self._captured_hotkey = key
-        self.hotkey_input.setStyleSheet("background-color: #d4edda; border: 2px solid #28a745;")
+        self.hotkey_input.setStyleSheet(HotkeyCapture.STYLE_SUCCESS)
     
     def get_hotkey(self) -> str:
         return self._captured_hotkey or self.hotkey_input.text()
