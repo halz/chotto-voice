@@ -614,11 +614,33 @@ class MainWindow(QMainWindow):
         }
         QComboBox::drop-down {
             border: none;
-            width: 20px;
+            width: 24px;
+            subcontrol-position: center right;
         }
         QComboBox::down-arrow {
-            image: none;
+            width: 12px;
+            height: 12px;
             border: none;
+            border-left: 2px solid #868e96;
+            border-bottom: 2px solid #868e96;
+            transform: rotate(-45deg);
+        }
+        QPushButton#posBtn {
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            background: #f8f9fa;
+            min-width: 32px;
+            min-height: 32px;
+            font-size: 10px;
+            color: #868e96;
+        }
+        QPushButton#posBtn:hover {
+            background: #e9ecef;
+        }
+        QPushButton#posBtn:checked {
+            background: #228be6;
+            border-color: #228be6;
+            color: white;
         }
         QComboBox QAbstractItemView {
             background-color: white;
@@ -866,23 +888,45 @@ class MainWindow(QMainWindow):
         
         layout.addSpacing(16)
         
-        # Overlay position
+        # Overlay position (visual grid)
         overlay_label = QLabel("インジケーター位置")
         overlay_label.setObjectName("sectionTitle")
         layout.addWidget(overlay_label)
         
-        from .overlay import OVERLAY_POSITIONS
-        self.overlay_position_combo = QComboBox()
-        for key, label in OVERLAY_POSITIONS.items():
-            self.overlay_position_combo.addItem(label, key)
-        self.overlay_position_combo.setFixedWidth(200)
+        # Create position grid
+        from PyQt6.QtWidgets import QGridLayout, QButtonGroup
+        pos_container = QWidget()
+        pos_container.setStyleSheet("background: #f1f3f5; border-radius: 8px; padding: 8px;")
+        pos_container.setFixedSize(120, 80)
+        pos_grid = QGridLayout(pos_container)
+        pos_grid.setSpacing(4)
+        pos_grid.setContentsMargins(8, 8, 8, 8)
+        
+        self.pos_buttons = {}
+        self.pos_button_group = QButtonGroup(self)
+        positions = [
+            ("top-left", 0, 0), ("top-center", 0, 1), ("top-right", 0, 2),
+            ("bottom-left", 1, 0), ("bottom-center", 1, 1), ("bottom-right", 1, 2)
+        ]
+        
         current_pos = self.user_config.overlay_position
-        for i in range(self.overlay_position_combo.count()):
-            if self.overlay_position_combo.itemData(i) == current_pos:
-                self.overlay_position_combo.setCurrentIndex(i)
-                break
-        self.overlay_position_combo.currentIndexChanged.connect(self._on_overlay_position_changed)
-        layout.addWidget(self.overlay_position_combo)
+        for pos_key, row, col in positions:
+            btn = QPushButton()
+            btn.setObjectName("posBtn")
+            btn.setCheckable(True)
+            btn.setFixedSize(32, 28)
+            if pos_key == current_pos:
+                btn.setChecked(True)
+            btn.clicked.connect(lambda checked, k=pos_key: self._on_position_btn_clicked(k))
+            self.pos_buttons[pos_key] = btn
+            self.pos_button_group.addButton(btn)
+            pos_grid.addWidget(btn, row, col)
+        
+        layout.addWidget(pos_container)
+        
+        # Keep combo hidden for compatibility
+        self.overlay_position_combo = QComboBox()
+        self.overlay_position_combo.hide()
         
         layout.addSpacing(16)
         
@@ -1035,6 +1079,11 @@ class MainWindow(QMainWindow):
     def _on_nav_changed(self, index: int):
         """Handle navigation change."""
         self.page_stack.setCurrentIndex(index)
+    
+    def _on_position_btn_clicked(self, position: str):
+        """Handle position button click."""
+        self.overlay.set_position(position)
+        self.user_config.update(overlay_position=position)
     
     def _setup_overlay(self):
         """Setup the overlay indicator."""
