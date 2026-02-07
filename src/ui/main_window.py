@@ -243,83 +243,170 @@ class HotkeySettingsDialog(QDialog):
 class FirstRunSetupDialog(QDialog):
     """First-run setup dialog for API key configuration."""
     
+    STYLE = """
+        QDialog {
+            background-color: #fafafa;
+        }
+        QLabel {
+            color: #333;
+        }
+        QLabel#title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+        QLabel#subtitle {
+            font-size: 13px;
+            color: #666;
+        }
+        QLabel#section {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1a1a1a;
+            padding-top: 8px;
+        }
+        QLabel#hint {
+            font-size: 12px;
+            color: #888;
+        }
+        QLineEdit {
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: white;
+            font-size: 13px;
+        }
+        QLineEdit:focus {
+            border-color: #4A90D9;
+        }
+        QPushButton#link {
+            background: transparent;
+            color: #4A90D9;
+            border: none;
+            font-size: 13px;
+            padding: 0;
+        }
+        QPushButton#link:hover {
+            color: #357ABD;
+            text-decoration: underline;
+        }
+        QPushButton#primary {
+            background-color: #4A90D9;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        QPushButton#primary:hover {
+            background-color: #357ABD;
+        }
+        QPushButton#secondary {
+            background-color: transparent;
+            color: #666;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 12px 24px;
+            font-size: 14px;
+        }
+        QPushButton#secondary:hover {
+            background-color: #f0f0f0;
+        }
+    """
+    
     def __init__(self, user_config: 'UserConfig', parent=None):
         super().__init__(parent)
         self.user_config = user_config
-        self.setWindowTitle("Chotto Voice - 初期設定")
-        self.setMinimumWidth(480)
+        self.setWindowTitle("Chotto Voice")
+        self.setFixedSize(440, 480)
         self.setModal(True)
+        self.setStyleSheet(self.STYLE)
         
         layout = QVBoxLayout(self)
-        layout.setSpacing(16)
-        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(12)
+        layout.setContentsMargins(32, 32, 32, 24)
         
-        # Welcome message
-        welcome = QLabel("🎤 Chotto Voice")
-        welcome.setStyleSheet("font-size: 24px; font-weight: bold;")
-        layout.addWidget(welcome)
+        # Title
+        title = QLabel("Chotto Voice")
+        title.setObjectName("title")
+        layout.addWidget(title)
         
-        intro = QLabel("無料で使う場合は Gemini APIキーのみでOK")
-        intro.setStyleSheet("color: #888; margin-bottom: 8px;")
-        layout.addWidget(intro)
+        subtitle = QLabel("音声入力を始めましょう")
+        subtitle.setObjectName("subtitle")
+        layout.addWidget(subtitle)
         
-        # Gemini (Free - Recommended)
-        gemini_group = QGroupBox("✨ Google Gemini（無料）")
-        gemini_group.setStyleSheet("QGroupBox { font-weight: bold; }")
-        gemini_layout = QHBoxLayout(gemini_group)
-        gemini_layout.setContentsMargins(12, 16, 12, 12)
+        layout.addSpacing(16)
+        
+        # Gemini (Free - Primary)
+        gemini_section = QLabel("Google Gemini（無料）")
+        gemini_section.setObjectName("section")
+        layout.addWidget(gemini_section)
         
         self.gemini_key_input = QLineEdit()
         self.gemini_key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.gemini_key_input.setPlaceholderText("APIキーを入力...")
-        self.gemini_key_input.setMinimumHeight(32)
-        gemini_layout.addWidget(self.gemini_key_input)
+        self.gemini_key_input.setPlaceholderText("APIキーを入力")
+        layout.addWidget(self.gemini_key_input)
         
-        gemini_link = QPushButton("取得")
-        gemini_link.setMinimumHeight(32)
+        gemini_hint_layout = QHBoxLayout()
+        gemini_hint = QLabel("AI整形に使用")
+        gemini_hint.setObjectName("hint")
+        gemini_hint_layout.addWidget(gemini_hint)
+        gemini_hint_layout.addStretch()
+        gemini_link = QPushButton("キーを取得 →")
+        gemini_link.setObjectName("link")
         gemini_link.setCursor(Qt.CursorShape.PointingHandCursor)
         gemini_link.clicked.connect(lambda: self._open_url("https://aistudio.google.com/app/apikey"))
-        gemini_layout.addWidget(gemini_link)
+        gemini_hint_layout.addWidget(gemini_link)
+        layout.addLayout(gemini_hint_layout)
         
-        layout.addWidget(gemini_group)
+        layout.addSpacing(8)
         
         # OpenAI (Optional)
-        openai_group = QGroupBox("OpenAI（オプション：高精度文字起こし）")
-        openai_layout = QHBoxLayout(openai_group)
-        openai_layout.setContentsMargins(12, 16, 12, 12)
+        openai_section = QLabel("OpenAI（オプション）")
+        openai_section.setObjectName("section")
+        layout.addWidget(openai_section)
         
         self.openai_key_input = QLineEdit()
         self.openai_key_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.openai_key_input.setPlaceholderText("sk-...")
-        self.openai_key_input.setMinimumHeight(32)
-        openai_layout.addWidget(self.openai_key_input)
+        layout.addWidget(self.openai_key_input)
         
-        openai_link = QPushButton("取得")
-        openai_link.setMinimumHeight(32)
+        openai_hint_layout = QHBoxLayout()
+        openai_hint = QLabel("高精度な文字起こしに使用")
+        openai_hint.setObjectName("hint")
+        openai_hint_layout.addWidget(openai_hint)
+        openai_hint_layout.addStretch()
+        openai_link = QPushButton("キーを取得 →")
+        openai_link.setObjectName("link")
         openai_link.setCursor(Qt.CursorShape.PointingHandCursor)
         openai_link.clicked.connect(lambda: self._open_url("https://platform.openai.com/api-keys"))
-        openai_layout.addWidget(openai_link)
+        openai_hint_layout.addWidget(openai_link)
+        layout.addLayout(openai_hint_layout)
         
-        layout.addWidget(openai_group)
+        layout.addSpacing(8)
         
         # Anthropic (Optional)
-        anthropic_group = QGroupBox("Anthropic Claude（オプション）")
-        anthropic_layout = QHBoxLayout(anthropic_group)
-        anthropic_layout.setContentsMargins(12, 16, 12, 12)
+        anthropic_section = QLabel("Anthropic（オプション）")
+        anthropic_section.setObjectName("section")
+        layout.addWidget(anthropic_section)
         
         self.anthropic_key_input = QLineEdit()
         self.anthropic_key_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.anthropic_key_input.setPlaceholderText("sk-ant-...")
-        self.anthropic_key_input.setMinimumHeight(32)
-        anthropic_layout.addWidget(self.anthropic_key_input)
+        layout.addWidget(self.anthropic_key_input)
         
-        anthropic_link = QPushButton("取得")
-        anthropic_link.setMinimumHeight(32)
+        anthropic_hint_layout = QHBoxLayout()
+        anthropic_hint = QLabel("Claude AIを使用する場合")
+        anthropic_hint.setObjectName("hint")
+        anthropic_hint_layout.addWidget(anthropic_hint)
+        anthropic_hint_layout.addStretch()
+        anthropic_link = QPushButton("キーを取得 →")
+        anthropic_link.setObjectName("link")
         anthropic_link.setCursor(Qt.CursorShape.PointingHandCursor)
         anthropic_link.clicked.connect(lambda: self._open_url("https://console.anthropic.com/settings/keys"))
-        anthropic_layout.addWidget(anthropic_link)
-        
-        layout.addWidget(anthropic_group)
+        anthropic_hint_layout.addWidget(anthropic_link)
+        layout.addLayout(anthropic_hint_layout)
         
         # Spacer
         layout.addStretch()
@@ -329,28 +416,17 @@ class FirstRunSetupDialog(QDialog):
         button_layout.setSpacing(12)
         
         skip_btn = QPushButton("スキップ")
-        skip_btn.setMinimumHeight(36)
+        skip_btn.setObjectName("secondary")
+        skip_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         skip_btn.clicked.connect(self.reject)
         button_layout.addWidget(skip_btn)
         
         button_layout.addStretch()
         
-        save_btn = QPushButton("保存して開始 →")
-        save_btn.setMinimumHeight(36)
-        save_btn.setMinimumWidth(140)
+        save_btn = QPushButton("開始する")
+        save_btn.setObjectName("primary")
+        save_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         save_btn.setDefault(True)
-        save_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-        """)
         save_btn.clicked.connect(self._save_and_accept)
         button_layout.addWidget(save_btn)
         
