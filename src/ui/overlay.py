@@ -54,12 +54,18 @@ class OverlayIndicator(QWidget):
         self._target_height = float(self.IDLE_HEIGHT)
         self._pulse_opacity = 1.0
         self._pulse_direction = -1
+        self._hover_scale = 1.0
+        self._shake_offset = 0.0
+        self._is_hovered = False
         
         self._setup_window()
         self._setup_timers()
         self._setup_animations()
         self._setup_context_menu()
         self._position_window()
+        
+        # Enable mouse tracking for hover
+        self.setMouseTracking(True)
     
     # Properties for animation
     @pyqtProperty(float)
@@ -113,6 +119,12 @@ class OverlayIndicator(QWidget):
         self._pulse_timer = QTimer(self)
         self._pulse_timer.timeout.connect(self._update_pulse)
         self._pulse_timer.setInterval(50)
+        
+        # Hover shake animation
+        self._shake_timer = QTimer(self)
+        self._shake_timer.timeout.connect(self._update_shake)
+        self._shake_timer.setInterval(30)
+        self._shake_frame = 0
     
     def _setup_animations(self):
         """Setup size transition animations."""
@@ -248,6 +260,43 @@ class OverlayIndicator(QWidget):
             self._pulse_direction = -1
         self.update()
     
+    def _update_shake(self):
+        """Update hover shake animation."""
+        import math
+        self._shake_frame += 1
+        
+        # Shake pattern: quick wiggle that settles
+        if self._shake_frame <= 8:
+            # Shake phase
+            intensity = (8 - self._shake_frame) / 8  # Decreasing intensity
+            self._shake_offset = math.sin(self._shake_frame * 2.5) * 2 * intensity
+            # Scale up
+            self._hover_scale = 1.0 + (self._shake_frame / 8) * 0.15
+        else:
+            # Settled at larger size
+            self._shake_offset = 0
+            self._hover_scale = 1.15
+            self._shake_timer.stop()
+        
+        self.update()
+    
+    def enterEvent(self, event):
+        """Handle mouse enter - start hover animation."""
+        if self._state == "idle":
+            self._is_hovered = True
+            self._shake_frame = 0
+            self._shake_timer.start()
+        super().enterEvent(event)
+    
+    def leaveEvent(self, event):
+        """Handle mouse leave - reset hover state."""
+        self._is_hovered = False
+        self._shake_timer.stop()
+        self._hover_scale = 1.0
+        self._shake_offset = 0
+        self.update()
+        super().leaveEvent(event)
+    
     def set_audio_level(self, level: float):
         """Update audio level for waveform (0.0 to 1.0)."""
         # Add real audio level to waveform
@@ -307,6 +356,14 @@ class OverlayIndicator(QWidget):
     
     def _draw_idle(self, painter: QPainter):
         """Draw idle state - small pill with dot."""
+        # Apply hover transformation
+        if self._is_hovered and self._hover_scale != 1.0:
+            center_x = self._current_width / 2
+            center_y = self._current_height / 2
+            painter.translate(center_x + self._shake_offset, center_y)
+            painter.scale(self._hover_scale, self._hover_scale)
+            painter.translate(-center_x, -center_y)
+        
         # Draw pill background
         path = QPainterPath()
         rect = QRectF(0, 0, self._current_width, self._current_height)
