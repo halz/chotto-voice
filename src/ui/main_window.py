@@ -637,13 +637,14 @@ class MainWindow(QMainWindow):
             border: 1px solid #ced4da;
             border-radius: 4px;
             background: #ffffff;
-            font-size: 10px;
-            color: #495057;
+            font-size: 14px;
+            color: #adb5bd;
             padding: 4px;
         }
         QPushButton#posBtn:hover {
             background: #f8f9fa;
             border-color: #adb5bd;
+            color: #495057;
         }
         QPushButton#posBtn:checked {
             background: #228be6;
@@ -918,7 +919,7 @@ class MainWindow(QMainWindow):
         from PyQt6.QtWidgets import QGridLayout, QButtonGroup
         pos_container = QWidget()
         pos_container.setObjectName("posGrid")
-        pos_container.setFixedSize(200, 70)
+        pos_container.setFixedSize(156, 70)
         pos_grid = QGridLayout(pos_container)
         pos_grid.setSpacing(4)
         pos_grid.setContentsMargins(6, 6, 6, 6)
@@ -926,20 +927,20 @@ class MainWindow(QMainWindow):
         self.pos_buttons = {}
         self.pos_button_group = QButtonGroup(self)
         positions = [
-            ("top-left", "左上", 0, 0), 
-            ("top-center", "中央", 0, 1), 
-            ("top-right", "右上", 0, 2),
-            ("bottom-left", "左下", 1, 0), 
-            ("bottom-center", "中央", 1, 1), 
-            ("bottom-right", "右下", 1, 2)
+            ("top-left", 0, 0), 
+            ("top-center", 0, 1), 
+            ("top-right", 0, 2),
+            ("bottom-left", 1, 0), 
+            ("bottom-center", 1, 1), 
+            ("bottom-right", 1, 2)
         ]
         
         current_pos = self.user_config.overlay_position
-        for pos_key, label, row, col in positions:
-            btn = QPushButton(label)
+        for pos_key, row, col in positions:
+            btn = QPushButton("🎤")
             btn.setObjectName("posBtn")
             btn.setCheckable(True)
-            btn.setFixedSize(60, 26)
+            btn.setFixedSize(46, 28)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             if pos_key == current_pos:
                 btn.setChecked(True)
@@ -974,6 +975,23 @@ class MainWindow(QMainWindow):
         self.hotkey_input.setPlaceholderText("クリックしてキーを押す")
         self.hotkey_input.hotkey_captured.connect(self._on_inline_hotkey_captured)
         layout.addWidget(self.hotkey_input)
+        
+        # Hotkey presets
+        preset_label = QLabel("プリセット")
+        preset_label.setObjectName("hint")
+        layout.addWidget(preset_label)
+        
+        preset_row = QHBoxLayout()
+        preset_row.setSpacing(6)
+        for name, key in [("右Ctrl", "right ctrl"), ("右Shift", "right shift"), ("右Alt", "right alt"), ("F9", "f9")]:
+            btn = QPushButton(name)
+            btn.setObjectName("secondary")
+            btn.setFixedHeight(28)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.clicked.connect(lambda checked, k=key: self._set_hotkey_preset(k))
+            preset_row.addWidget(btn)
+        preset_row.addStretch()
+        layout.addLayout(preset_row)
         
         # Keep reference for compatibility
         self.hotkey_label = self.hotkey_input
@@ -1136,6 +1154,13 @@ class MainWindow(QMainWindow):
             self.hotkey_config.key = hotkey
             self.hotkey_manager.update_hotkey(hotkey)
             self.user_config.update(hotkey=hotkey)
+    
+    def _set_hotkey_preset(self, key: str):
+        """Set a preset hotkey."""
+        self.hotkey_input.setText(key)
+        self.hotkey_config.key = key
+        self.hotkey_manager.update_hotkey(key)
+        self.user_config.update(hotkey=key)
     
     def _setup_overlay(self):
         """Setup the overlay indicator."""
