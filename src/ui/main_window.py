@@ -769,16 +769,20 @@ class MainWindow(QMainWindow):
         self.tray_icon.setToolTip("Chotto Voice 🎤")
         self.overlay.set_state("idle")
         
+        print(f"[Finished] text='{text[:30] if text else '(empty)'}...', auto_type={self._auto_type}", flush=True)
         if text and self._auto_type:
             # Small delay then type to focused field
             QTimer.singleShot(100, lambda: self._type_result(text))
     
     def _type_result(self, text: str):
         """Type result to focused field."""
+        print(f"[TypeResult] Typing: '{text[:30] if text else '(empty)'}...'", flush=True)
         try:
             type_to_focused_field(text)
+            print("[TypeResult] Success", flush=True)
             self.status_label.setText("✅ 入力完了")
         except Exception as e:
+            print(f"[TypeResult] Error: {e}", flush=True)
             self.status_label.setText(f"入力エラー: {e}")
             self.status_label.setStyleSheet("color: red;")
     
