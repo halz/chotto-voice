@@ -426,7 +426,7 @@ class OverlayIndicator(QWidget):
         painter.setBrush(QBrush(color))
         painter.drawEllipse(QRectF(mic_x, mic_y, mic_size, mic_size))
         
-        # Processing dots
+        # Processing dots (animated)
         painter.setBrush(QBrush(self.MIC_ICON_COLOR))
         dot_size = 3
         mic_center_x = mic_x + mic_size / 2
@@ -441,14 +441,13 @@ class OverlayIndicator(QWidget):
                 dot_size, dot_size
             ))
         
-        # Draw "処理中..." text
+        # Draw shorter text "処理中"
         painter.setPen(QPen(self.TIMER_COLOR))
-        font = QFont("SF Pro", 11)
-        font.setWeight(QFont.Weight.Medium)
+        font = QFont("Yu Gothic UI", 10)
         painter.setFont(font)
         
-        text_rect = QRectF(mic_x + mic_size + 8, 0, self._current_width - mic_size - 20, self._current_height)
-        painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, "処理中...")
+        text_rect = QRectF(mic_x + mic_size + 6, 0, self._current_width - mic_size - 14, self._current_height)
+        painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, "処理中")
     
     def show_indicator(self):
         """Show the overlay."""
