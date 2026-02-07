@@ -8,9 +8,12 @@ from enum import Enum
 import keyboard
 
 
+DEBUG = False  # Set to True for debugging
+
 def debug_print(msg: str):
     """Print debug message and flush immediately."""
-    print(msg, file=sys.stderr, flush=True)
+    if DEBUG:
+        print(msg, file=sys.stderr, flush=True)
 
 
 class HotkeyAction(Enum):
