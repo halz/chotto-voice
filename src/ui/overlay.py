@@ -1,19 +1,37 @@
 """Overlay indicator for Chotto Voice - iOS-style recording indicator."""
-from PyQt6.QtWidgets import QWidget, QApplication
-from PyQt6.QtCore import Qt, QTimer, QRectF, QPointF, QPropertyAnimation, QEasingCurve, pyqtProperty
-from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QFont, QPainterPath
+from PyQt6.QtWidgets import QWidget, QApplication, QMenu
+from PyQt6.QtCore import Qt, QTimer, QRectF, QPointF, QPropertyAnimation, QEasingCurve, pyqtProperty, pyqtSignal
+from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QFont, QPainterPath, QAction, QCursor
 import time
 import random
 
 
+# Position options
+OVERLAY_POSITIONS = {
+    "top-left": "左上",
+    "top-center": "上中央",
+    "top-right": "右上",
+    "bottom-left": "左下",
+    "bottom-center": "下中央",
+    "bottom-right": "右下",
+}
+
+
 class OverlayIndicator(QWidget):
-    """iOS-style overlay indicator in bottom-right corner."""
+    """iOS-style overlay indicator with configurable position."""
+    
+    # Signals for menu actions
+    recording_toggled = pyqtSignal()
+    settings_requested = pyqtSignal()
+    quit_requested = pyqtSignal()
     
     # Sizes (smaller)
     IDLE_WIDTH = 44
     IDLE_HEIGHT = 22
     RECORDING_WIDTH = 220
     RECORDING_HEIGHT = 36
+    
+    MARGIN = 20  # Margin from screen edges
     
     # Colors
     BG_COLOR = QColor(45, 45, 48, 230)  # Dark gray, slightly transparent
@@ -24,9 +42,10 @@ class OverlayIndicator(QWidget):
     TIMER_COLOR = QColor(160, 160, 160)  # Gray
     PROCESSING_COLOR = QColor(255, 152, 0)  # Orange
     
-    def __init__(self, size: int = 24):
+    def __init__(self, position: str = "bottom-right"):
         super().__init__()
         self._state = "idle"  # idle, recording, processing
+        self._position = position
         self._recording_start_time = 0
         self._audio_levels = [0.1] * 30  # Waveform data (fewer bars for smaller size)
         self._current_width = float(self.IDLE_WIDTH)
@@ -39,6 +58,7 @@ class OverlayIndicator(QWidget):
         self._setup_window()
         self._setup_timers()
         self._setup_animations()
+        self._setup_context_menu()
         self._position_window()
     
     # Properties for animation
@@ -69,12 +89,13 @@ class OverlayIndicator(QWidget):
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.WindowStaysOnTopHint |
-            Qt.WindowType.Tool |  # Don't show in taskbar
-            Qt.WindowType.WindowTransparentForInput  # Click-through
+            Qt.WindowType.Tool  # Don't show in taskbar
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         self.setFixedSize(int(self._current_width), int(self._current_height))
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._show_context_menu)
     
     def _setup_timers(self):
         """Setup animation timers."""
@@ -104,6 +125,39 @@ class OverlayIndicator(QWidget):
         self._height_anim = QPropertyAnimation(self, b"animatedHeight")
         self._height_anim.setDuration(200)  # 200ms
         self._height_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+    
+    def _setup_context_menu(self):
+        """Setup right-click context menu."""
+        self._context_menu = QMenu(self)
+        
+        # Recording control
+        self._record_action = QAction("🎤 録音開始", self)
+        self._record_action.triggered.connect(self.recording_toggled.emit)
+        self._context_menu.addAction(self._record_action)
+        
+        self._context_menu.addSeparator()
+        
+        # Settings
+        settings_action = QAction("⚙️ 設定", self)
+        settings_action.triggered.connect(self.settings_requested.emit)
+        self._context_menu.addAction(settings_action)
+        
+        self._context_menu.addSeparator()
+        
+        # Quit
+        quit_action = QAction("終了", self)
+        quit_action.triggered.connect(self.quit_requested.emit)
+        self._context_menu.addAction(quit_action)
+    
+    def _show_context_menu(self, pos):
+        """Show context menu at cursor position."""
+        # Update record action text based on state
+        if self._state == "recording":
+            self._record_action.setText("⏹️ 録音停止")
+        else:
+            self._record_action.setText("🎤 録音開始")
+        
+        self._context_menu.exec(QCursor.pos())
     
     def _update_size(self, animate: bool = True):
         """Update widget size based on state with optional animation."""
@@ -135,13 +189,43 @@ class OverlayIndicator(QWidget):
             self._position_window()
     
     def _position_window(self):
-        """Position window in bottom-right corner."""
+        """Position window based on configured position."""
         screen = QApplication.primaryScreen()
-        if screen:
-            geometry = screen.availableGeometry()
-            x = geometry.right() - int(self._current_width) - 20  # 20px margin
-            y = geometry.bottom() - int(self._current_height) - 20
-            self.move(x, y)
+        if not screen:
+            return
+        
+        geometry = screen.availableGeometry()
+        w = int(self._current_width)
+        h = int(self._current_height)
+        m = self.MARGIN
+        
+        # Calculate position based on setting
+        if self._position == "top-left":
+            x = geometry.left() + m
+            y = geometry.top() + m
+        elif self._position == "top-center":
+            x = geometry.left() + (geometry.width() - w) // 2
+            y = geometry.top() + m
+        elif self._position == "top-right":
+            x = geometry.right() - w - m
+            y = geometry.top() + m
+        elif self._position == "bottom-left":
+            x = geometry.left() + m
+            y = geometry.bottom() - h - m
+        elif self._position == "bottom-center":
+            x = geometry.left() + (geometry.width() - w) // 2
+            y = geometry.bottom() - h - m
+        else:  # bottom-right (default)
+            x = geometry.right() - w - m
+            y = geometry.bottom() - h - m
+        
+        self.move(x, y)
+    
+    def set_position(self, position: str):
+        """Set overlay position."""
+        if position in OVERLAY_POSITIONS:
+            self._position = position
+            self._position_window()
     
     def _update_timer(self):
         """Update recording timer display."""

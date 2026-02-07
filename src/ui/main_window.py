@@ -447,6 +447,28 @@ class MainWindow(QMainWindow):
             
             layout.addLayout(startup_layout)
         
+        # Overlay position setting
+        overlay_layout = QHBoxLayout()
+        overlay_layout.addWidget(QLabel("インジケーター位置:"))
+        
+        from .overlay import OVERLAY_POSITIONS
+        self.overlay_position_combo = QComboBox()
+        for key, label in OVERLAY_POSITIONS.items():
+            self.overlay_position_combo.addItem(label, key)
+        
+        # Set current value
+        current_pos = self.user_config.overlay_position
+        for i in range(self.overlay_position_combo.count()):
+            if self.overlay_position_combo.itemData(i) == current_pos:
+                self.overlay_position_combo.setCurrentIndex(i)
+                break
+        
+        self.overlay_position_combo.currentIndexChanged.connect(self._on_overlay_position_changed)
+        overlay_layout.addWidget(self.overlay_position_combo)
+        overlay_layout.addStretch()
+        
+        layout.addLayout(overlay_layout)
+        
         # API Keys section
         api_group = QGroupBox("APIキー設定")
         api_layout = QFormLayout(api_group)
@@ -495,7 +517,13 @@ class MainWindow(QMainWindow):
     
     def _setup_overlay(self):
         """Setup the overlay indicator."""
-        self.overlay = OverlayIndicator(size=24)
+        self.overlay = OverlayIndicator(position=self.user_config.overlay_position)
+        
+        # Connect overlay signals
+        self.overlay.recording_toggled.connect(self._toggle_recording)
+        self.overlay.settings_requested.connect(self._show_settings)
+        self.overlay.quit_requested.connect(self._quit_app)
+        
         self.overlay.show_indicator()
     
     def _setup_tray(self):
@@ -805,6 +833,12 @@ class MainWindow(QMainWindow):
             )
         else:
             self.user_config.update(start_with_windows=checked)
+    
+    def _on_overlay_position_changed(self, index: int):
+        """Handle overlay position change."""
+        position = self.overlay_position_combo.itemData(index)
+        self.overlay.set_position(position)
+        self.user_config.update(overlay_position=position)
     
     def _open_hotkey_settings(self):
         """Open hotkey settings dialog."""

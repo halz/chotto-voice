@@ -49,6 +49,10 @@ class UserConfig:
     auto_type: bool = True
     process_with_ai: bool = True
     
+    # Overlay settings
+    # Positions: top-left, top-center, top-right, bottom-left, bottom-center, bottom-right
+    overlay_position: str = "bottom-right"
+    
     # Startup settings
     start_with_windows: bool = False
     start_minimized: bool = True
