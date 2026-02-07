@@ -1,5 +1,7 @@
 """System audio control for Chotto Voice."""
 import sys
+import time
+import threading
 from abc import ABC, abstractmethod
 
 
@@ -25,6 +27,26 @@ class AudioController(ABC):
     def toggle_mute(self) -> bool:
         """Toggle mute state. Returns new mute state."""
         pass
+    
+    @abstractmethod
+    def fade_out(self, duration: float = 0.3) -> bool:
+        """Fade out system audio over duration seconds."""
+        pass
+    
+    @abstractmethod
+    def fade_in(self, duration: float = 0.3) -> bool:
+        """Fade in system audio over duration seconds."""
+        pass
+    
+    @abstractmethod
+    def get_volume(self) -> float:
+        """Get current volume level (0.0 to 1.0)."""
+        pass
+    
+    @abstractmethod
+    def set_volume(self, level: float) -> bool:
+        """Set volume level (0.0 to 1.0)."""
+        pass
 
 
 class WindowsAudioController(AudioController):
@@ -32,6 +54,8 @@ class WindowsAudioController(AudioController):
     
     def __init__(self):
         self._interface = None
+        self._saved_volume = 1.0  # Save volume before fade out
+        self._fade_thread = None
         self._init_audio()
     
     def _init_audio(self):
@@ -62,6 +86,84 @@ class WindowsAudioController(AudioController):
         except Exception as e:
             print(f"Failed to initialize Windows audio: {e}")
             self._interface = None
+    
+    def get_volume(self) -> float:
+        """Get current volume level (0.0 to 1.0)."""
+        if not self._interface:
+            return 1.0
+        try:
+            return self._interface.GetMasterVolumeLevelScalar()
+        except Exception:
+            return 1.0
+    
+    def set_volume(self, level: float) -> bool:
+        """Set volume level (0.0 to 1.0)."""
+        if not self._interface:
+            return False
+        try:
+            level = max(0.0, min(1.0, level))
+            self._interface.SetMasterVolumeLevelScalar(level, None)
+            return True
+        except Exception:
+            return False
+    
+    def fade_out(self, duration: float = 0.3) -> bool:
+        """Fade out system audio over duration seconds."""
+        if not self._interface:
+            return self.mute()
+        
+        try:
+            self._saved_volume = self.get_volume()
+            if self._saved_volume <= 0.01:
+                return True
+            
+            steps = 10
+            step_duration = duration / steps
+            step_volume = self._saved_volume / steps
+            
+            def do_fade():
+                current = self._saved_volume
+                for _ in range(steps):
+                    current -= step_volume
+                    self.set_volume(max(0.0, current))
+                    time.sleep(step_duration)
+                self.set_volume(0.0)
+            
+            # Run fade in background thread
+            self._fade_thread = threading.Thread(target=do_fade, daemon=True)
+            self._fade_thread.start()
+            return True
+        except Exception as e:
+            print(f"Fade out error: {e}")
+            return self.mute()
+    
+    def fade_in(self, duration: float = 0.3) -> bool:
+        """Fade in system audio over duration seconds."""
+        if not self._interface:
+            return self.unmute()
+        
+        try:
+            target_volume = self._saved_volume if self._saved_volume > 0.01 else 1.0
+            
+            steps = 10
+            step_duration = duration / steps
+            step_volume = target_volume / steps
+            
+            def do_fade():
+                current = 0.0
+                for _ in range(steps):
+                    current += step_volume
+                    self.set_volume(min(target_volume, current))
+                    time.sleep(step_duration)
+                self.set_volume(target_volume)
+            
+            # Run fade in background thread
+            self._fade_thread = threading.Thread(target=do_fade, daemon=True)
+            self._fade_thread.start()
+            return True
+        except Exception as e:
+            print(f"Fade in error: {e}")
+            return self.unmute()
     
     def mute(self) -> bool:
         """Mute system audio."""
@@ -143,6 +245,7 @@ class DummyAudioController(AudioController):
     
     def __init__(self):
         self._muted = False
+        self._volume = 1.0
     
     def mute(self) -> bool:
         self._muted = True
@@ -158,6 +261,21 @@ class DummyAudioController(AudioController):
     def toggle_mute(self) -> bool:
         self._muted = not self._muted
         return self._muted
+    
+    def get_volume(self) -> float:
+        return self._volume
+    
+    def set_volume(self, level: float) -> bool:
+        self._volume = max(0.0, min(1.0, level))
+        return True
+    
+    def fade_out(self, duration: float = 0.3) -> bool:
+        self._volume = 0.0
+        return True
+    
+    def fade_in(self, duration: float = 0.3) -> bool:
+        self._volume = 1.0
+        return True
 
 
 def get_audio_controller() -> AudioController:

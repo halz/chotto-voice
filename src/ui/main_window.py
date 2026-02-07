@@ -558,6 +558,9 @@ class MainWindow(QMainWindow):
             self.status_label.setStyleSheet("color: red;")
             return
         
+        # Fade out system audio
+        self.audio_controller.fade_out(duration=0.3)
+        
         self.recorder.on_audio_level = self._update_audio_level
         self.recorder.start_recording()
         
@@ -586,6 +589,9 @@ class MainWindow(QMainWindow):
     def _stop_recording(self):
         """Stop recording and process."""
         audio_data = self.recorder.stop_recording()
+        
+        # Fade in system audio
+        self.audio_controller.fade_in(duration=0.3)
         
         self.record_btn.setText("🎤 録音開始")
         self.record_btn.setStyleSheet("""
