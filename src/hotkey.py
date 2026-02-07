@@ -96,10 +96,11 @@ class HotkeyManager:
         
         def on_release(event):
             event_key = normalize_key(event.name)
+            debug_print(f"[Hotkey] Release event: '{event.name}' -> '{event_key}'")
             if event_key == target_key:
                 # Check if it was a quick tap (not held for other purposes)
                 elapsed = time.time() - self._modifier_press_time
-                debug_print(f"[Hotkey] Release detected: '{event_key}', elapsed: {elapsed:.3f}s")
+                debug_print(f"[Hotkey] Release MATCHED: '{event_key}', elapsed: {elapsed:.3f}s")
                 if 0.05 < elapsed < self._modifier_tap_threshold:
                     debug_print(f"[Hotkey] Triggering hotkey!")
                     self._on_hotkey_pressed()
