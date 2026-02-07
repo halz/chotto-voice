@@ -14,11 +14,15 @@ from src.ui.main_window import MainWindow
 
 def main():
     """Main entry point."""
+    import sys
+    print("[Main] Starting Chotto Voice...", file=sys.stderr, flush=True)
+    
     # Load settings
     settings = get_settings()
     
     # Load persistent user config
     user_config = UserConfig.load()
+    print(f"[Main] User config hotkey: '{user_config.hotkey}'", file=sys.stderr, flush=True)
     
     # Create components
     recorder = AudioRecorder(
@@ -68,6 +72,7 @@ def main():
         double_tap_threshold=user_config.hotkey_double_tap_threshold,
         hold_threshold=user_config.hotkey_hold_threshold
     )
+    print(f"[Main] Hotkey config key: '{hotkey_config.key}'", file=sys.stderr, flush=True)
     
     # Create and run application
     app = QApplication(sys.argv)
