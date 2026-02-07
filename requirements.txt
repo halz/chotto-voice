@@ -9,7 +9,7 @@ numpy>=1.24.0
 # AI APIs
 anthropic>=0.18.0
 openai>=1.12.0
-google-generativeai>=0.4.0
+google-genai>=1.0.0
 
 # Speech-to-text
 # Local Whisper (optional - for free local transcription)

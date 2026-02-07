@@ -474,7 +474,6 @@ class MainWindow(QMainWindow):
         whisper_layout = QFormLayout(whisper_group)
         
         # Provider selection
-        from PyQt6.QtWidgets import QComboBox
         self.whisper_provider_combo = QComboBox()
         self.whisper_provider_combo.addItem("🆓 ローカル (無料・オフライン)", "local")
         self.whisper_provider_combo.addItem("☁️ OpenAI API (高速・高精度)", "api")

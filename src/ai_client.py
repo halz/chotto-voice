@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, Generator
 import anthropic
 import openai
-import google.generativeai as genai
+from google import genai
 
 
 class AIClient(ABC):
@@ -147,22 +147,16 @@ class GeminiClient(AIClient):
 整形結果のみを出力。"""
     
     def __init__(self, api_key: str, model: str = "gemini-2.0-flash"):
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel(
-            model_name=model,
-            system_instruction=self.DEFAULT_SYSTEM_PROMPT
-        )
+        self.client = genai.Client(api_key=api_key)
+        self.model_name = model
     
     def process(self, text: str, system_prompt: Optional[str] = None) -> str:
         """Process text through Gemini."""
-        if system_prompt:
-            model = genai.GenerativeModel(
-                model_name=self.model.model_name,
-                system_instruction=system_prompt
-            )
-            response = model.generate_content(text)
-        else:
-            response = self.model.generate_content(text)
+        prompt = system_prompt or self.DEFAULT_SYSTEM_PROMPT
+        response = self.client.models.generate_content(
+            model=self.model_name,
+            contents=f"{prompt}\n\n{text}"
+        )
         return response.text
     
     def process_stream(
@@ -171,14 +165,11 @@ class GeminiClient(AIClient):
         system_prompt: Optional[str] = None
     ) -> Generator[str, None, None]:
         """Process text through Gemini with streaming."""
-        if system_prompt:
-            model = genai.GenerativeModel(
-                model_name=self.model.model_name,
-                system_instruction=system_prompt
-            )
-            response = model.generate_content(text, stream=True)
-        else:
-            response = self.model.generate_content(text, stream=True)
+        prompt = system_prompt or self.DEFAULT_SYSTEM_PROMPT
+        response = self.client.models.generate_content_stream(
+            model=self.model_name,
+            contents=f"{prompt}\n\n{text}"
+        )
         for chunk in response:
             if chunk.text:
                 yield chunk.text
