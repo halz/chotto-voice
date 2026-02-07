@@ -621,10 +621,23 @@ class MainWindow(QMainWindow):
             border: none;
         }
         QComboBox QAbstractItemView {
-            background: white;
+            background-color: white;
             border: 1px solid #dee2e6;
             selection-background-color: #e7f1ff;
+            selection-color: #212529;
+            color: #212529;
             outline: none;
+            padding: 4px;
+        }
+        QComboBox QAbstractItemView::item {
+            padding: 6px 12px;
+            min-height: 24px;
+            color: #212529;
+            background-color: white;
+        }
+        QComboBox QAbstractItemView::item:selected {
+            background-color: #e7f1ff;
+            color: #212529;
         }
         QTextEdit {
             border: 1px solid #dee2e6;
