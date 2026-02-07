@@ -264,24 +264,33 @@ class TranscriptionWorker(QThread):
     def run(self):
         try:
             # Step 1: Transcribe
+            print(f"[Worker] Transcribing audio ({len(self.audio_data)} bytes)...", flush=True)
             text = self.transcriber.transcribe(self.audio_data)
+            print(f"[Worker] Transcription: '{text[:50] if text else '(empty)'}...'", flush=True)
             self.transcription_done.emit(text)
             
             if not text:
+                print("[Worker] No text, skipping AI", flush=True)
                 self.finished.emit("")
                 return
             
             # Step 2: AI processing (if enabled and available)
+            print(f"[Worker] AI: process_with_ai={self.process_with_ai}, client={self.ai_client is not None}", flush=True)
             if self.process_with_ai and self.ai_client:
+                print(f"[Worker] Starting AI processing with {type(self.ai_client).__name__}...", flush=True)
                 result_text = ""
                 for chunk in self.ai_client.process_stream(text):
+                    print(f"[Worker] AI chunk: '{chunk}'", flush=True)
                     self.ai_chunk.emit(chunk)
                     result_text += chunk
+                print(f"[Worker] AI result: '{result_text[:50] if result_text else '(empty)'}...'", flush=True)
                 self.finished.emit(result_text)
             else:
+                print("[Worker] Skipping AI, using raw text", flush=True)
                 self.finished.emit(text)
                 
         except Exception as e:
+            print(f"[Worker] Error: {e}", flush=True)
             self.error.emit(str(e))
 
 
