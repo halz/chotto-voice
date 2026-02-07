@@ -81,7 +81,9 @@ class HotkeyManager:
         self._modifier_tap_threshold = 0.5  # seconds for valid tap
         self._modifier_is_pressed = False
         self._last_tap_time = 0
+        self._last_release_time = 0  # For debouncing
         self._double_tap_threshold = 0.6  # seconds between taps for double-tap (wider window)
+        self._debounce_threshold = 0.03  # 30ms debounce to filter key bounce
         
         # Normalize key for matching (handle ctrl/control variants)
         def normalize_key(k: str) -> str:
@@ -100,21 +102,26 @@ class HotkeyManager:
             if event_key == target_key:
                 if event.event_type == 'down':
                     if not self._modifier_is_pressed:
-                        self._modifier_press_time = time.time()
+                        current_time = time.time()
+                        # Debounce: ignore press too soon after release (key bounce)
+                        if current_time - self._last_release_time < self._debounce_threshold:
+                            return
+                        self._modifier_press_time = current_time
                         self._modifier_is_pressed = True
                         debug_print(f"[Hotkey] Press detected: '{event_key}'")
                 elif event.event_type == 'up':
                     if self._modifier_is_pressed:
                         self._modifier_is_pressed = False
-                        elapsed = time.time() - self._modifier_press_time
+                        current_release_time = time.time()
+                        elapsed = current_release_time - self._modifier_press_time
+                        self._last_release_time = current_release_time
                         debug_print(f"[Hotkey] Release detected: '{event_key}', elapsed: {elapsed:.3f}s")
                         
                         # Check if it was a valid tap
-                        # Very low threshold for stopping (0.005s), higher for starting
-                        min_threshold = 0.005 if self._is_recording else 0.02
+                        # Very low threshold to accept fast taps on Windows
+                        min_threshold = 0.001  # 1ms minimum to filter out noise
                         if min_threshold < elapsed < self._modifier_tap_threshold:
-                            current_time = time.time()
-                            time_since_last_tap = current_time - self._last_tap_time
+                            time_since_last_tap = current_release_time - self._last_tap_time
                             
                             if self._is_recording:
                                 # If recording, single tap stops it
@@ -127,7 +134,7 @@ class HotkeyManager:
                             else:
                                 debug_print(f"[Hotkey] Single tap (gap: {time_since_last_tap:.3f}s > {self._double_tap_threshold}s, waiting)")
                             
-                            self._last_tap_time = current_time
+                            self._last_tap_time = current_release_time
         
         keyboard.hook(on_event)
     
