@@ -371,11 +371,11 @@ class OverlayIndicator(QWidget):
         
         painter.setBrush(QBrush(self.BG_COLOR))
         
-        # Add bright border on hover
+        # Always show bright border (brighter on hover)
         if self._is_hovered:
-            painter.setPen(QPen(QColor(120, 120, 140), 1))  # Light border
+            painter.setPen(QPen(QColor(150, 150, 170), 1))  # Brighter on hover
         else:
-            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setPen(QPen(QColor(80, 80, 100), 1))  # Normal border
         
         painter.drawPath(path)
         
@@ -395,7 +395,7 @@ class OverlayIndicator(QWidget):
         path.addRoundedRect(rect, self._current_height / 2, self._current_height / 2)
         
         painter.setBrush(QBrush(self.BG_COLOR))
-        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setPen(QPen(QColor(80, 80, 100), 1))  # Border
         painter.drawPath(path)
         
         # Draw microphone icon with red background
@@ -480,7 +480,7 @@ class OverlayIndicator(QWidget):
         path.addRoundedRect(rect, self._current_height / 2, self._current_height / 2)
         
         painter.setBrush(QBrush(self.BG_COLOR))
-        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setPen(QPen(QColor(80, 80, 100), 1))  # Border
         painter.drawPath(path)
         
         # Draw processing icon with orange background (pulsing)
