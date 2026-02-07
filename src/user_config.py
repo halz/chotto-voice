@@ -43,7 +43,7 @@ class UserConfig:
     
     # Whisper settings
     whisper_provider: str = "local"  # "local" or "api" - default to free local
-    whisper_local_model: str = "base"  # tiny, base, small, medium, large
+    whisper_local_model: str = "small"  # tiny, base, small, medium, large
     
     # Hotkey settings
     hotkey: str = "ctrl+shift+space"
