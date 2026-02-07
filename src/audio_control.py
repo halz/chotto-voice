@@ -73,10 +73,11 @@ class WindowsAudioController(AudioController):
             )
             self._interface = cast(interface, POINTER(IAudioEndpointVolume))
         except ImportError:
-            print("pycaw not installed, audio control disabled")
+            # pycaw not installed - silently disable
             self._interface = None
-        except Exception as e:
-            print(f"Failed to initialize Windows audio: {e}")
+        except Exception:
+            # Audio control not available - silently disable
+            # This is not critical, the app works without it
             self._interface = None
     
     def _get_audio_sessions(self):
