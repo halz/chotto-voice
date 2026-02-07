@@ -62,6 +62,9 @@ class UserConfig:
     start_with_windows: bool = False
     start_minimized: bool = True
     
+    # First run flag
+    first_run_complete: bool = False
+    
     @classmethod
     def load(cls) -> "UserConfig":
         """Load config from file, or return defaults."""

@@ -240,6 +240,147 @@ class HotkeySettingsDialog(QDialog):
         return self._captured_hotkey or self.hotkey_input.text()
 
 
+class FirstRunSetupDialog(QDialog):
+    """First-run setup dialog for API key configuration."""
+    
+    def __init__(self, user_config: 'UserConfig', parent=None):
+        super().__init__(parent)
+        self.user_config = user_config
+        self.setWindowTitle("Chotto Voice - 初期設定")
+        self.setMinimumWidth(500)
+        self.setModal(True)
+        
+        layout = QVBoxLayout(self)
+        
+        # Welcome message
+        welcome = QLabel("🎤 Chotto Voice へようこそ！")
+        welcome.setStyleSheet("font-size: 18px; font-weight: bold; margin-bottom: 10px;")
+        layout.addWidget(welcome)
+        
+        intro = QLabel(
+            "音声入力アシスタントの初期設定を行います。\n"
+            "無料で使う場合は Gemini APIキーのみでOKです。"
+        )
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
+        
+        # Gemini (Free - Recommended)
+        gemini_group = QGroupBox("🆓 Google Gemini (無料・推奨)")
+        gemini_layout = QFormLayout(gemini_group)
+        
+        self.gemini_key_input = QLineEdit()
+        self.gemini_key_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.gemini_key_input.setPlaceholderText("AIza...")
+        
+        gemini_row = QHBoxLayout()
+        gemini_row.addWidget(self.gemini_key_input)
+        gemini_link = QPushButton("🔗")
+        gemini_link.setToolTip("APIキーを取得")
+        gemini_link.setFixedWidth(30)
+        gemini_link.clicked.connect(lambda: self._open_url("https://aistudio.google.com/app/apikey"))
+        gemini_row.addWidget(gemini_link)
+        gemini_layout.addRow("APIキー:", gemini_row)
+        
+        layout.addWidget(gemini_group)
+        
+        # OpenAI (Optional - for better transcription)
+        openai_group = QGroupBox("☁️ OpenAI (オプション - 高精度文字起こし)")
+        openai_layout = QFormLayout(openai_group)
+        
+        self.openai_key_input = QLineEdit()
+        self.openai_key_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.openai_key_input.setPlaceholderText("sk-...")
+        
+        openai_row = QHBoxLayout()
+        openai_row.addWidget(self.openai_key_input)
+        openai_link = QPushButton("🔗")
+        openai_link.setToolTip("APIキーを取得")
+        openai_link.setFixedWidth(30)
+        openai_link.clicked.connect(lambda: self._open_url("https://platform.openai.com/api-keys"))
+        openai_row.addWidget(openai_link)
+        openai_layout.addRow("APIキー:", openai_row)
+        
+        openai_note = QLabel("※ Whisper API用。設定するとローカルより高精度に。")
+        openai_note.setStyleSheet("color: gray; font-size: 11px;")
+        openai_layout.addRow(openai_note)
+        
+        layout.addWidget(openai_group)
+        
+        # Anthropic (Optional)
+        anthropic_group = QGroupBox("🤖 Anthropic Claude (オプション)")
+        anthropic_layout = QFormLayout(anthropic_group)
+        
+        self.anthropic_key_input = QLineEdit()
+        self.anthropic_key_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.anthropic_key_input.setPlaceholderText("sk-ant-...")
+        
+        anthropic_row = QHBoxLayout()
+        anthropic_row.addWidget(self.anthropic_key_input)
+        anthropic_link = QPushButton("🔗")
+        anthropic_link.setToolTip("APIキーを取得")
+        anthropic_link.setFixedWidth(30)
+        anthropic_link.clicked.connect(lambda: self._open_url("https://console.anthropic.com/settings/keys"))
+        anthropic_row.addWidget(anthropic_link)
+        anthropic_layout.addRow("APIキー:", anthropic_row)
+        
+        layout.addWidget(anthropic_group)
+        
+        # Free mode explanation
+        free_note = QLabel(
+            "💡 無料で使う場合:\n"
+            "• 文字起こし: ローカルWhisper (small) - オフライン動作\n"
+            "• AI整形: Google Gemini - 無料枠で十分"
+        )
+        free_note.setStyleSheet("background: #e8f5e9; padding: 10px; border-radius: 5px;")
+        layout.addWidget(free_note)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        
+        skip_btn = QPushButton("スキップ (あとで設定)")
+        skip_btn.clicked.connect(self.reject)
+        button_layout.addWidget(skip_btn)
+        
+        button_layout.addStretch()
+        
+        save_btn = QPushButton("✅ 保存して開始")
+        save_btn.setDefault(True)
+        save_btn.clicked.connect(self._save_and_accept)
+        button_layout.addWidget(save_btn)
+        
+        layout.addLayout(button_layout)
+    
+    def _open_url(self, url: str):
+        """Open URL in browser."""
+        import webbrowser
+        webbrowser.open(url)
+    
+    def _save_and_accept(self):
+        """Save API keys and accept dialog."""
+        gemini_key = self.gemini_key_input.text().strip()
+        openai_key = self.openai_key_input.text().strip()
+        anthropic_key = self.anthropic_key_input.text().strip()
+        
+        # Save to config
+        self.user_config.update(
+            gemini_api_key=gemini_key,
+            openai_api_key=openai_key,
+            anthropic_api_key=anthropic_key,
+            # If OpenAI key provided, use API for transcription
+            whisper_provider="api" if openai_key else "local"
+        )
+        
+        self.accept()
+    
+    def get_keys(self) -> dict:
+        """Return the entered API keys."""
+        return {
+            "gemini": self.gemini_key_input.text().strip(),
+            "openai": self.openai_key_input.text().strip(),
+            "anthropic": self.anthropic_key_input.text().strip()
+        }
+
+
 class TranscriptionWorker(QThread):
     """Worker thread for transcription + AI processing."""
     
