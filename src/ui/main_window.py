@@ -281,6 +281,7 @@ class TranscriptionWorker(QThread):
                 for chunk in self.ai_client.process_stream(text):
                     self.ai_chunk.emit(chunk)
                     result_text += chunk
+                print(f"[Worker] AI result: '{result_text[:100]}{'...' if len(result_text) > 100 else ''}'", flush=True)
                 self.finished.emit(result_text)
             else:
                 self.finished.emit(text)
