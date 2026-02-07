@@ -1,10 +1,16 @@
 """Hotkey management for Chotto Voice."""
+import sys
 import time
 import threading
 from typing import Callable, Optional
 from dataclasses import dataclass
 from enum import Enum
 import keyboard
+
+
+def debug_print(msg: str):
+    """Print debug message and flush immediately."""
+    print(msg, file=sys.stderr, flush=True)
 
 
 class HotkeyAction(Enum):
@@ -52,9 +58,9 @@ class HotkeyManager:
         
         key = self.config.key.lower().strip()
         
-        print(f"[Hotkey] Starting with key: '{key}'")
-        print(f"[Hotkey] SINGLE_MODIFIER_KEYS: {SINGLE_MODIFIER_KEYS}")
-        print(f"[Hotkey] Is single modifier: {key in SINGLE_MODIFIER_KEYS}")
+        debug_print(f"[Hotkey] Starting with key: '{key}'")
+        debug_print(f"[Hotkey] SINGLE_MODIFIER_KEYS: {SINGLE_MODIFIER_KEYS}")
+        debug_print(f"[Hotkey] Is single modifier: {key in SINGLE_MODIFIER_KEYS}")
         
         # Check if this is a single modifier key (needs special handling)
         if key in SINGLE_MODIFIER_KEYS:
@@ -80,22 +86,22 @@ class HotkeyManager:
             return k
         
         target_key = normalize_key(key)
-        print(f"[Hotkey] Setting up single modifier hotkey: '{target_key}'")
+        debug_print(f"[Hotkey] Setting up single modifier hotkey: '{target_key}'")
         
         def on_press(event):
             event_key = normalize_key(event.name)
             if event_key == target_key:
                 self._modifier_press_time = time.time()
-                print(f"[Hotkey] Press detected: '{event_key}'")
+                debug_print(f"[Hotkey] Press detected: '{event_key}'")
         
         def on_release(event):
             event_key = normalize_key(event.name)
             if event_key == target_key:
                 # Check if it was a quick tap (not held for other purposes)
                 elapsed = time.time() - self._modifier_press_time
-                print(f"[Hotkey] Release detected: '{event_key}', elapsed: {elapsed:.3f}s")
+                debug_print(f"[Hotkey] Release detected: '{event_key}', elapsed: {elapsed:.3f}s")
                 if 0.05 < elapsed < self._modifier_tap_threshold:
-                    print(f"[Hotkey] Triggering hotkey!")
+                    debug_print(f"[Hotkey] Triggering hotkey!")
                     self._on_hotkey_pressed()
         
         keyboard.on_press(on_press)
