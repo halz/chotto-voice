@@ -752,12 +752,14 @@ class MainWindow(QMainWindow):
         transcriber: Transcriber,
         ai_client: Optional[AIClient] = None,
         hotkey_config: Optional[HotkeyConfig] = None,
-        user_config: Optional[UserConfig] = None
+        user_config: Optional[UserConfig] = None,
+        api: Optional['ChottoVoiceAPI'] = None  # Server API client
     ):
         super().__init__()
         self.recorder = recorder
         self.transcriber = transcriber
         self.ai_client = ai_client
+        self.api = api  # For online mode (account, credits, etc.)
         
         self._worker: Optional[TranscriptionWorker] = None
         
@@ -838,7 +840,11 @@ class MainWindow(QMainWindow):
         self.nav_list = QListWidget()
         self.nav_list.addItem("設定")
         self.nav_list.addItem("音声認識")
-        self.nav_list.addItem("APIキー")
+        # Show "アカウント" in online mode, "APIキー" in offline mode
+        if self.api and self.api.is_authenticated:
+            self.nav_list.addItem("アカウント")
+        else:
+            self.nav_list.addItem("APIキー")
         self.nav_list.setCurrentRow(0)
         self.nav_list.currentRowChanged.connect(self._on_nav_changed)
         sidebar_layout.addWidget(self.nav_list)
@@ -1059,18 +1065,82 @@ class MainWindow(QMainWindow):
         self.page_stack.addWidget(page)
     
     def _create_api_page(self):
-        """Create the API keys page."""
+        """Create the API keys / Account page based on mode."""
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
         
+        # Online mode: Show account info
+        if self.api and self.api.is_authenticated:
+            self._create_account_content(layout)
+        else:
+            # Offline mode: Show API key inputs
+            self._create_api_keys_content(layout)
+        
+        layout.addStretch()
+        self.page_stack.addWidget(page)
+    
+    def _create_account_content(self, layout):
+        """Create account page content for online mode."""
+        # Page title
+        title = QLabel("アカウント")
+        title.setObjectName("pageTitle")
+        layout.addWidget(title)
+        
+        # User info
+        email_label = QLabel(f"📧 {self.api.session.email}")
+        email_label.setObjectName("settingLabel")
+        layout.addWidget(email_label)
+        
+        if self.api.session.name:
+            name_label = QLabel(f"👤 {self.api.session.name}")
+            name_label.setObjectName("hint")
+            layout.addWidget(name_label)
+        
+        layout.addSpacing(24)
+        
+        # Credits section
+        credits_title = QLabel("クレジット")
+        credits_title.setObjectName("sectionTitle")
+        layout.addWidget(credits_title)
+        
+        self.credits_label = QLabel(f"🪙 {self.api.session.credits} クレジット")
+        self.credits_label.setStyleSheet("font-size: 24px; font-weight: 600; color: #228be6;")
+        layout.addWidget(self.credits_label)
+        
+        credits_hint = QLabel("1クレジット = 15秒の音声認識")
+        credits_hint.setObjectName("hint")
+        layout.addWidget(credits_hint)
+        
+        layout.addSpacing(16)
+        
+        # Purchase button
+        buy_btn = QPushButton("クレジットを購入")
+        buy_btn.setObjectName("primary")
+        buy_btn.setFixedWidth(160)
+        buy_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        buy_btn.clicked.connect(self._show_purchase_dialog)
+        layout.addWidget(buy_btn)
+        
+        layout.addSpacing(32)
+        
+        # Logout button
+        logout_btn = QPushButton("ログアウト")
+        logout_btn.setObjectName("secondary")
+        logout_btn.setFixedWidth(120)
+        logout_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        logout_btn.clicked.connect(self._logout)
+        layout.addWidget(logout_btn)
+    
+    def _create_api_keys_content(self, layout):
+        """Create API keys content for offline mode."""
         # Page title
         title = QLabel("APIキー")
         title.setObjectName("pageTitle")
         layout.addWidget(title)
         
-        hint = QLabel("各サービスのAPIキーを設定")
+        hint = QLabel("各サービスのAPIキーを設定（オフラインモード）")
         hint.setObjectName("hint")
         layout.addWidget(hint)
         
@@ -1123,9 +1193,72 @@ class MainWindow(QMainWindow):
         save_btn.clicked.connect(self._save_api_keys)
         save_row.addWidget(save_btn)
         layout.addLayout(save_row)
+    
+    def _show_purchase_dialog(self):
+        """Show credit purchase dialog."""
+        if not self.api:
+            return
         
-        layout.addStretch()
-        self.page_stack.addWidget(page)
+        dialog = QDialog(self)
+        dialog.setWindowTitle("クレジット購入")
+        dialog.setFixedSize(320, 280)
+        
+        layout = QVBoxLayout(dialog)
+        layout.setSpacing(12)
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        title = QLabel("パッケージを選択")
+        title.setStyleSheet("font-size: 16px; font-weight: 600;")
+        layout.addWidget(title)
+        
+        # Package list
+        package_list = QListWidget()
+        try:
+            packages = self.api.get_packages()
+            for pkg in packages:
+                price_display = f"${pkg['price_cents']/100:.2f}"
+                item = QListWidgetItem(f"{pkg['name']}\n{pkg['credits']}クレジット - {price_display}")
+                item.setData(Qt.ItemDataRole.UserRole, pkg['id'])
+                package_list.addItem(item)
+            package_list.setCurrentRow(0)
+        except Exception as e:
+            package_list.addItem(f"エラー: {e}")
+        
+        layout.addWidget(package_list)
+        
+        # Purchase button
+        buy_btn = QPushButton("購入へ進む")
+        buy_btn.setObjectName("primary")
+        buy_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        
+        def do_purchase():
+            item = package_list.currentItem()
+            if item:
+                package_id = item.data(Qt.ItemDataRole.UserRole)
+                if package_id:
+                    try:
+                        self.api.purchase_credits(package_id)
+                        dialog.accept()
+                    except Exception as e:
+                        QMessageBox.warning(dialog, "エラー", str(e))
+        
+        buy_btn.clicked.connect(do_purchase)
+        layout.addWidget(buy_btn)
+        
+        dialog.exec()
+    
+    def _logout(self):
+        """Log out and restart app."""
+        reply = QMessageBox.question(
+            self, "ログアウト",
+            "ログアウトしますか？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            self.user_config.clear_login()
+            QMessageBox.information(self, "ログアウト", "ログアウトしました。アプリを再起動してください。")
+            self._quit_app()
     
     def _on_nav_changed(self, index: int):
         """Handle navigation change."""
