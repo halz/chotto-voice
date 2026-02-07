@@ -265,17 +265,17 @@ class OverlayIndicator(QWidget):
         import math
         self._shake_frame += 1
         
-        # Shake pattern: quick wiggle that settles (shorter)
-        if self._shake_frame <= 4:
+        # Shake pattern: quick wiggle that settles
+        if self._shake_frame <= 8:
             # Shake phase
-            intensity = (4 - self._shake_frame) / 4  # Decreasing intensity
-            self._shake_offset = math.sin(self._shake_frame * 3) * 1.5 * intensity
+            intensity = (8 - self._shake_frame) / 8  # Decreasing intensity
+            self._shake_offset = math.sin(self._shake_frame * 2.5) * 2 * intensity
             # Scale up
-            self._hover_scale = 1.0 + (self._shake_frame / 4) * 0.1
+            self._hover_scale = 1.0 + (self._shake_frame / 8) * 0.15
         else:
             # Settled at larger size
             self._shake_offset = 0
-            self._hover_scale = 1.1
+            self._hover_scale = 1.15
             self._shake_timer.stop()
         
         self.update()
@@ -370,7 +370,13 @@ class OverlayIndicator(QWidget):
         path.addRoundedRect(rect, self._current_height / 2, self._current_height / 2)
         
         painter.setBrush(QBrush(self.BG_COLOR))
-        painter.setPen(Qt.PenStyle.NoPen)
+        
+        # Add bright border on hover
+        if self._is_hovered:
+            painter.setPen(QPen(QColor(120, 120, 140), 1))  # Light border
+        else:
+            painter.setPen(Qt.PenStyle.NoPen)
+        
         painter.drawPath(path)
         
         # Draw center dot
@@ -378,6 +384,7 @@ class OverlayIndicator(QWidget):
         dot_x = (self._current_width - dot_size) / 2
         dot_y = (self._current_height - dot_size) / 2
         painter.setBrush(QBrush(self.IDLE_DOT_COLOR))
+        painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(QRectF(dot_x, dot_y, dot_size, dot_size))
     
     def _draw_recording(self, painter: QPainter):
