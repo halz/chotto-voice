@@ -5,7 +5,8 @@ from PyQt6.QtWidgets import (
     QPushButton, QTextEdit, QLabel, QProgressBar,
     QSystemTrayIcon, QMenu, QComboBox, QGroupBox,
     QDialog, QFormLayout, QLineEdit, QDialogButtonBox,
-    QCheckBox, QMessageBox, QFrame
+    QCheckBox, QMessageBox, QFrame, QListWidget, QListWidgetItem,
+    QStackedWidget, QScrollArea
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QIcon, QAction, QCloseEvent, QKeyEvent
@@ -530,120 +531,138 @@ class MainWindow(QMainWindow):
     """Main application window."""
     
     STYLE = """
-        QMainWindow, QWidget#central {
-            background-color: #fafafa;
+        QMainWindow {
+            background-color: #ffffff;
         }
-        QLabel {
-            color: #333;
+        QWidget#sidebar {
+            background-color: #f8f9fa;
+            border-right: 1px solid #e9ecef;
         }
-        QLabel#title {
+        QWidget#content {
+            background-color: #ffffff;
+        }
+        QListWidget {
+            background-color: transparent;
+            border: none;
+            font-size: 13px;
+            outline: none;
+        }
+        QListWidget::item {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin: 2px 8px;
+            color: #495057;
+        }
+        QListWidget::item:selected {
+            background-color: #e7f1ff;
+            color: #1971c2;
+        }
+        QListWidget::item:hover:!selected {
+            background-color: #f1f3f4;
+        }
+        QLabel#appTitle {
+            font-size: 16px;
+            font-weight: 600;
+            color: #212529;
+            padding: 16px;
+        }
+        QLabel#pageTitle {
             font-size: 18px;
             font-weight: 600;
-            color: #1a1a1a;
+            color: #212529;
+            padding-bottom: 8px;
         }
-        QLabel#section {
-            font-size: 14px;
+        QLabel#sectionTitle {
+            font-size: 13px;
             font-weight: 600;
-            color: #1a1a1a;
-            padding-top: 12px;
+            color: #495057;
+            padding-top: 16px;
+            padding-bottom: 4px;
         }
         QLabel#hint {
             font-size: 12px;
-            color: #888;
+            color: #868e96;
+        }
+        QLabel#settingLabel {
+            font-size: 13px;
+            color: #212529;
         }
         QLineEdit, QComboBox {
             padding: 8px 12px;
-            border: 1px solid #ddd;
+            border: 1px solid #dee2e6;
             border-radius: 6px;
-            background: white;
+            background: #ffffff;
             font-size: 13px;
-            min-height: 20px;
+            min-height: 18px;
+            color: #212529;
         }
         QLineEdit:focus, QComboBox:focus {
-            border-color: #4A90D9;
+            border-color: #4dabf7;
         }
         QComboBox::drop-down {
             border: none;
             padding-right: 8px;
         }
-        QTextEdit {
-            border: 1px solid #ddd;
-            border-radius: 6px;
+        QComboBox QAbstractItemView {
             background: white;
+            border: 1px solid #dee2e6;
+            selection-background-color: #e7f1ff;
+        }
+        QTextEdit {
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            background: #ffffff;
             font-size: 13px;
             padding: 8px;
         }
         QCheckBox {
             font-size: 13px;
-            color: #333;
+            color: #212529;
             spacing: 8px;
         }
         QCheckBox::indicator {
             width: 18px;
             height: 18px;
             border-radius: 4px;
-            border: 1px solid #ccc;
+            border: 1px solid #ced4da;
             background: white;
         }
         QCheckBox::indicator:checked {
-            background: #2563eb;
-            border-color: #2563eb;
+            background: #228be6;
+            border-color: #228be6;
         }
-        QPushButton#record {
-            background-color: #2563eb;
+        QPushButton#primary {
+            background-color: #228be6;
             color: white;
             border: none;
-            border-radius: 8px;
-            padding: 16px;
-            font-size: 15px;
-            font-weight: 600;
+            border-radius: 6px;
+            padding: 10px 20px;
+            font-size: 13px;
+            font-weight: 500;
         }
-        QPushButton#record:hover {
-            background-color: #1d4ed8;
+        QPushButton#primary:hover {
+            background-color: #1c7ed6;
         }
-        QPushButton#record:pressed {
-            background-color: #1e40af;
-        }
-        QPushButton#record[recording="true"] {
-            background-color: #dc2626;
-        }
-        QPushButton#record[recording="true"]:hover {
-            background-color: #b91c1c;
-        }
-        QPushButton#save {
-            background-color: #f3f4f6;
-            color: #374151;
-            border: 1px solid #d1d5db;
+        QPushButton#secondary {
+            background-color: #f8f9fa;
+            color: #495057;
+            border: 1px solid #dee2e6;
             border-radius: 6px;
             padding: 8px 16px;
             font-size: 13px;
         }
-        QPushButton#save:hover {
-            background-color: #e5e7eb;
-        }
-        QPushButton#settings {
-            background: transparent;
-            border: none;
-            padding: 4px;
-            font-size: 16px;
-        }
-        QPushButton#settings:hover {
-            background-color: #e5e7eb;
-            border-radius: 4px;
+        QPushButton#secondary:hover {
+            background-color: #e9ecef;
         }
         QProgressBar {
             border: none;
-            background: #e5e7eb;
+            background: #e9ecef;
             border-radius: 2px;
             max-height: 4px;
         }
         QProgressBar::chunk {
-            background: #2563eb;
+            background: #228be6;
             border-radius: 2px;
-        }
-        QFrame#separator {
-            background-color: #e5e7eb;
-            max-height: 1px;
         }
     """
     
@@ -710,9 +729,9 @@ class MainWindow(QMainWindow):
             self.record_btn.setEnabled(False)
     
     def _setup_ui(self):
-        """Setup the user interface (Settings window)."""
+        """Setup the user interface with sidebar navigation."""
         self.setWindowTitle("Chotto Voice")
-        self.setFixedSize(420, 620)
+        self.setFixedSize(600, 480)
         self.setStyleSheet(self.STYLE)
         self.setWindowFlags(
             Qt.WindowType.Window |
@@ -720,17 +739,73 @@ class MainWindow(QMainWindow):
             Qt.WindowType.WindowMinimizeButtonHint
         )
         
-        # Central widget
+        # Central widget with horizontal layout
         central = QWidget()
-        central.setObjectName("central")
         self.setCentralWidget(central)
-        layout = QVBoxLayout(central)
-        layout.setSpacing(8)
-        layout.setContentsMargins(24, 20, 24, 20)
+        main_layout = QHBoxLayout(central)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
         
-        # Title
-        title = QLabel("Chotto Voice")
-        title.setObjectName("title")
+        # === Sidebar ===
+        sidebar = QWidget()
+        sidebar.setObjectName("sidebar")
+        sidebar.setFixedWidth(160)
+        sidebar_layout = QVBoxLayout(sidebar)
+        sidebar_layout.setContentsMargins(0, 0, 0, 0)
+        sidebar_layout.setSpacing(0)
+        
+        # App title in sidebar
+        app_title = QLabel("Chotto Voice")
+        app_title.setObjectName("appTitle")
+        sidebar_layout.addWidget(app_title)
+        
+        # Navigation list
+        self.nav_list = QListWidget()
+        self.nav_list.addItem("⚙️  設定")
+        self.nav_list.addItem("🎤  音声認識")
+        self.nav_list.addItem("🔑  APIキー")
+        self.nav_list.setCurrentRow(0)
+        self.nav_list.currentRowChanged.connect(self._on_nav_changed)
+        sidebar_layout.addWidget(self.nav_list)
+        
+        sidebar_layout.addStretch()
+        main_layout.addWidget(sidebar)
+        
+        # === Content Area ===
+        content = QWidget()
+        content.setObjectName("content")
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(24, 20, 24, 20)
+        content_layout.setSpacing(0)
+        
+        # Stacked widget for pages
+        self.page_stack = QStackedWidget()
+        content_layout.addWidget(self.page_stack)
+        
+        # Create pages
+        self._create_settings_page()
+        self._create_whisper_page()
+        self._create_api_page()
+        
+        main_layout.addWidget(content)
+        
+        # Hidden elements for compatibility
+        self.mute_indicator = QLabel("🔊")
+        self.level_bar = QProgressBar()
+        self.level_bar.setMaximum(100)
+        self.result_text = QTextEdit()
+        self.record_btn = QPushButton()  # Hidden, for hotkey
+    
+    def _create_settings_page(self):
+        """Create the general settings page."""
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+        
+        # Page title
+        title = QLabel("設定")
+        title.setObjectName("pageTitle")
         layout.addWidget(title)
         
         # Status
@@ -740,72 +815,7 @@ class MainWindow(QMainWindow):
         
         layout.addSpacing(8)
         
-        # Record button
-        self.record_btn = QPushButton("録音開始")
-        self.record_btn.setObjectName("record")
-        self.record_btn.setMinimumHeight(50)
-        self.record_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.record_btn.clicked.connect(self._toggle_recording)
-        layout.addWidget(self.record_btn)
-        
-        # Audio level
-        self.level_bar = QProgressBar()
-        self.level_bar.setMaximum(100)
-        self.level_bar.setTextVisible(False)
-        layout.addWidget(self.level_bar)
-        
-        layout.addSpacing(4)
-        
-        # Result
-        self.result_text = QTextEdit()
-        self.result_text.setPlaceholderText("音声認識の結果がここに表示されます...")
-        self.result_text.setMaximumHeight(80)
-        layout.addWidget(self.result_text)
-        
-        # Separator
-        sep1 = QFrame()
-        sep1.setObjectName("separator")
-        sep1.setFrameShape(QFrame.Shape.HLine)
-        layout.addWidget(sep1)
-        
-        # Settings section
-        settings_label = QLabel("設定")
-        settings_label.setObjectName("section")
-        layout.addWidget(settings_label)
-        
-        # Whisper provider
-        whisper_row = QHBoxLayout()
-        whisper_row.addWidget(QLabel("音声認識"))
-        whisper_row.addStretch()
-        self.whisper_provider_combo = QComboBox()
-        self.whisper_provider_combo.addItem("ローカル", "local")
-        self.whisper_provider_combo.addItem("OpenAI API", "api")
-        self.whisper_provider_combo.setFixedWidth(140)
-        current_provider = self.user_config.whisper_provider
-        self.whisper_provider_combo.setCurrentIndex(0 if current_provider == "local" else 1)
-        self.whisper_provider_combo.currentIndexChanged.connect(self._on_whisper_provider_changed)
-        whisper_row.addWidget(self.whisper_provider_combo)
-        layout.addLayout(whisper_row)
-        
-        # Model selection
-        model_row = QHBoxLayout()
-        model_row.addWidget(QLabel("モデル"))
-        model_row.addStretch()
-        self.whisper_model_combo = QComboBox()
-        self.whisper_model_combo.addItem("tiny", "tiny")
-        self.whisper_model_combo.addItem("base", "base")
-        self.whisper_model_combo.addItem("small", "small")
-        self.whisper_model_combo.setFixedWidth(140)
-        model_map = {"tiny": 0, "base": 1, "small": 2}
-        self.whisper_model_combo.setCurrentIndex(model_map.get(self.user_config.whisper_local_model, 2))
-        self.whisper_model_combo.setEnabled(current_provider == "local")
-        self.whisper_model_combo.currentIndexChanged.connect(self._on_whisper_model_changed)
-        model_row.addWidget(self.whisper_model_combo)
-        layout.addLayout(model_row)
-        
         # Options
-        layout.addSpacing(8)
-        
         self.auto_type_check = QCheckBox("フォーカス中のフィールドに入力")
         self.auto_type_check.setChecked(self._auto_type)
         self.auto_type_check.toggled.connect(self._on_auto_type_changed)
@@ -823,91 +833,177 @@ class MainWindow(QMainWindow):
             self.startup_check.toggled.connect(self._on_startup_changed)
             layout.addWidget(self.startup_check)
         
+        layout.addSpacing(16)
+        
         # Overlay position
-        overlay_row = QHBoxLayout()
-        overlay_row.addWidget(QLabel("インジケーター"))
-        overlay_row.addStretch()
+        overlay_label = QLabel("インジケーター位置")
+        overlay_label.setObjectName("sectionTitle")
+        layout.addWidget(overlay_label)
+        
         from .overlay import OVERLAY_POSITIONS
         self.overlay_position_combo = QComboBox()
         for key, label in OVERLAY_POSITIONS.items():
             self.overlay_position_combo.addItem(label, key)
-        self.overlay_position_combo.setFixedWidth(140)
+        self.overlay_position_combo.setFixedWidth(200)
         current_pos = self.user_config.overlay_position
         for i in range(self.overlay_position_combo.count()):
             if self.overlay_position_combo.itemData(i) == current_pos:
                 self.overlay_position_combo.setCurrentIndex(i)
                 break
         self.overlay_position_combo.currentIndexChanged.connect(self._on_overlay_position_changed)
-        overlay_row.addWidget(self.overlay_position_combo)
-        layout.addLayout(overlay_row)
+        layout.addWidget(self.overlay_position_combo)
+        
+        layout.addSpacing(16)
         
         # Hotkey
+        hotkey_label = QLabel("ホットキー")
+        hotkey_label.setObjectName("sectionTitle")
+        layout.addWidget(hotkey_label)
+        
         hotkey_row = QHBoxLayout()
-        self.hotkey_label = QLabel(f"ホットキー: {self.hotkey_config.key}")
+        self.hotkey_label = QLabel(self.hotkey_config.key)
+        self.hotkey_label.setObjectName("settingLabel")
         hotkey_row.addWidget(self.hotkey_label)
         hotkey_row.addStretch()
-        self.mute_indicator = QLabel("🔊")
-        hotkey_row.addWidget(self.mute_indicator)
         self.hotkey_btn = QPushButton("変更")
-        self.hotkey_btn.setObjectName("save")
+        self.hotkey_btn.setObjectName("secondary")
         self.hotkey_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.hotkey_btn.clicked.connect(self._open_hotkey_settings)
         hotkey_row.addWidget(self.hotkey_btn)
         layout.addLayout(hotkey_row)
         
-        # Separator
-        sep2 = QFrame()
-        sep2.setObjectName("separator")
-        sep2.setFrameShape(QFrame.Shape.HLine)
-        layout.addWidget(sep2)
+        layout.addStretch()
+        self.page_stack.addWidget(page)
+    
+    def _create_whisper_page(self):
+        """Create the Whisper/speech recognition page."""
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
         
-        # API Keys section
-        api_label = QLabel("APIキー")
-        api_label.setObjectName("section")
-        layout.addWidget(api_label)
+        # Page title
+        title = QLabel("音声認識")
+        title.setObjectName("pageTitle")
+        layout.addWidget(title)
+        
+        hint = QLabel("Whisperによる音声認識の設定")
+        hint.setObjectName("hint")
+        layout.addWidget(hint)
+        
+        layout.addSpacing(16)
+        
+        # Provider
+        provider_label = QLabel("認識エンジン")
+        provider_label.setObjectName("sectionTitle")
+        layout.addWidget(provider_label)
+        
+        self.whisper_provider_combo = QComboBox()
+        self.whisper_provider_combo.addItem("ローカル（無料・オフライン）", "local")
+        self.whisper_provider_combo.addItem("OpenAI API（高速・高精度）", "api")
+        self.whisper_provider_combo.setFixedWidth(250)
+        current_provider = self.user_config.whisper_provider
+        self.whisper_provider_combo.setCurrentIndex(0 if current_provider == "local" else 1)
+        self.whisper_provider_combo.currentIndexChanged.connect(self._on_whisper_provider_changed)
+        layout.addWidget(self.whisper_provider_combo)
+        
+        layout.addSpacing(16)
+        
+        # Model
+        model_label = QLabel("モデルサイズ")
+        model_label.setObjectName("sectionTitle")
+        layout.addWidget(model_label)
+        
+        self.whisper_model_combo = QComboBox()
+        self.whisper_model_combo.addItem("tiny（最速・39MB）", "tiny")
+        self.whisper_model_combo.addItem("base（バランス・74MB）", "base")
+        self.whisper_model_combo.addItem("small（高精度・244MB）", "small")
+        self.whisper_model_combo.setFixedWidth(250)
+        model_map = {"tiny": 0, "base": 1, "small": 2}
+        self.whisper_model_combo.setCurrentIndex(model_map.get(self.user_config.whisper_local_model, 2))
+        self.whisper_model_combo.setEnabled(current_provider == "local")
+        self.whisper_model_combo.currentIndexChanged.connect(self._on_whisper_model_changed)
+        layout.addWidget(self.whisper_model_combo)
+        
+        model_hint = QLabel("ローカルモード時のみ選択可能")
+        model_hint.setObjectName("hint")
+        layout.addWidget(model_hint)
+        
+        layout.addStretch()
+        self.page_stack.addWidget(page)
+    
+    def _create_api_page(self):
+        """Create the API keys page."""
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+        
+        # Page title
+        title = QLabel("APIキー")
+        title.setObjectName("pageTitle")
+        layout.addWidget(title)
+        
+        hint = QLabel("各サービスのAPIキーを設定")
+        hint.setObjectName("hint")
+        layout.addWidget(hint)
+        
+        layout.addSpacing(16)
         
         # Gemini
-        gemini_row = QHBoxLayout()
-        gemini_row.addWidget(QLabel("Gemini"))
+        gemini_label = QLabel("Google Gemini（無料）")
+        gemini_label.setObjectName("sectionTitle")
+        layout.addWidget(gemini_label)
+        
         self.gemini_key_input = QLineEdit()
         self.gemini_key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.gemini_key_input.setPlaceholderText("APIキー")
+        self.gemini_key_input.setPlaceholderText("AIza...")
         if self.user_config.gemini_api_key:
             self.gemini_key_input.setText(self.user_config.gemini_api_key)
-        gemini_row.addWidget(self.gemini_key_input)
-        layout.addLayout(gemini_row)
+        layout.addWidget(self.gemini_key_input)
         
         # OpenAI
-        openai_row = QHBoxLayout()
-        openai_row.addWidget(QLabel("OpenAI"))
+        openai_label = QLabel("OpenAI")
+        openai_label.setObjectName("sectionTitle")
+        layout.addWidget(openai_label)
+        
         self.openai_key_input = QLineEdit()
         self.openai_key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.openai_key_input.setPlaceholderText("APIキー")
+        self.openai_key_input.setPlaceholderText("sk-...")
         if self.user_config.openai_api_key:
             self.openai_key_input.setText(self.user_config.openai_api_key)
-        openai_row.addWidget(self.openai_key_input)
-        layout.addLayout(openai_row)
+        layout.addWidget(self.openai_key_input)
         
         # Anthropic
-        anthropic_row = QHBoxLayout()
-        anthropic_row.addWidget(QLabel("Anthropic"))
+        anthropic_label = QLabel("Anthropic")
+        anthropic_label.setObjectName("sectionTitle")
+        layout.addWidget(anthropic_label)
+        
         self.anthropic_key_input = QLineEdit()
         self.anthropic_key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.anthropic_key_input.setPlaceholderText("APIキー")
+        self.anthropic_key_input.setPlaceholderText("sk-ant-...")
         if self.user_config.anthropic_api_key:
             self.anthropic_key_input.setText(self.user_config.anthropic_api_key)
-        anthropic_row.addWidget(self.anthropic_key_input)
-        layout.addLayout(anthropic_row)
+        layout.addWidget(self.anthropic_key_input)
+        
+        layout.addSpacing(16)
         
         # Save button
         save_row = QHBoxLayout()
         save_row.addStretch()
-        save_keys_btn = QPushButton("保存")
-        save_keys_btn.setObjectName("save")
-        save_keys_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        save_keys_btn.clicked.connect(self._save_api_keys)
-        save_row.addWidget(save_keys_btn)
+        save_btn = QPushButton("保存")
+        save_btn.setObjectName("primary")
+        save_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        save_btn.clicked.connect(self._save_api_keys)
+        save_row.addWidget(save_btn)
         layout.addLayout(save_row)
+        
+        layout.addStretch()
+        self.page_stack.addWidget(page)
+    
+    def _on_nav_changed(self, index: int):
+        """Handle navigation change."""
+        self.page_stack.setCurrentIndex(index)
     
     def _setup_overlay(self):
         """Setup the overlay indicator."""
