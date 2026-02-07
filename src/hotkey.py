@@ -8,7 +8,7 @@ from enum import Enum
 import keyboard
 
 
-DEBUG = False  # Set to True for debugging
+DEBUG = True  # Set to True for debugging
 
 def debug_print(msg: str):
     """Print debug message and flush immediately."""
