@@ -469,6 +469,41 @@ class MainWindow(QMainWindow):
         
         layout.addLayout(overlay_layout)
         
+        # Whisper settings section
+        whisper_group = QGroupBox("音声認識設定")
+        whisper_layout = QFormLayout(whisper_group)
+        
+        # Provider selection
+        from PyQt6.QtWidgets import QComboBox
+        self.whisper_provider_combo = QComboBox()
+        self.whisper_provider_combo.addItem("🆓 ローカル (無料・オフライン)", "local")
+        self.whisper_provider_combo.addItem("☁️ OpenAI API (高速・高精度)", "api")
+        
+        # Set current value
+        current_provider = self.user_config.whisper_provider
+        index = 0 if current_provider == "local" else 1
+        self.whisper_provider_combo.setCurrentIndex(index)
+        self.whisper_provider_combo.currentIndexChanged.connect(self._on_whisper_provider_changed)
+        whisper_layout.addRow("Whisper:", self.whisper_provider_combo)
+        
+        # Local model selection
+        self.whisper_model_combo = QComboBox()
+        self.whisper_model_combo.addItem("tiny (最速・39MB)", "tiny")
+        self.whisper_model_combo.addItem("base (バランス・74MB)", "base")
+        self.whisper_model_combo.addItem("small (高精度・244MB)", "small")
+        
+        # Set current model
+        current_model = self.user_config.whisper_local_model
+        model_map = {"tiny": 0, "base": 1, "small": 2}
+        self.whisper_model_combo.setCurrentIndex(model_map.get(current_model, 1))
+        self.whisper_model_combo.currentIndexChanged.connect(self._on_whisper_model_changed)
+        whisper_layout.addRow("モデル:", self.whisper_model_combo)
+        
+        # Enable/disable model combo based on provider
+        self.whisper_model_combo.setEnabled(current_provider == "local")
+        
+        layout.addWidget(whisper_group)
+        
         # API Keys section
         api_group = QGroupBox("APIキー設定")
         api_layout = QFormLayout(api_group)
@@ -885,6 +920,64 @@ class MainWindow(QMainWindow):
         position = self.overlay_position_combo.itemData(index)
         self.overlay.set_position(position)
         self.user_config.update(overlay_position=position)
+    
+    def _on_whisper_provider_changed(self, index: int):
+        """Handle Whisper provider change."""
+        provider = self.whisper_provider_combo.itemData(index)
+        self.user_config.update(whisper_provider=provider)
+        
+        # Enable/disable model combo
+        self.whisper_model_combo.setEnabled(provider == "local")
+        
+        # Reinitialize transcriber
+        self._reinit_transcriber()
+    
+    def _on_whisper_model_changed(self, index: int):
+        """Handle Whisper model change."""
+        model = self.whisper_model_combo.itemData(index)
+        self.user_config.update(whisper_local_model=model)
+        
+        # Reinitialize transcriber if using local
+        if self.user_config.whisper_provider == "local":
+            self._reinit_transcriber()
+    
+    def _reinit_transcriber(self):
+        """Reinitialize transcriber based on current settings."""
+        provider = self.user_config.whisper_provider
+        
+        if provider == "local":
+            try:
+                from ..transcriber import create_transcriber
+                model = self.user_config.whisper_local_model
+                self.transcriber = create_transcriber(
+                    provider="local",
+                    model=model
+                )
+                self.record_btn.setEnabled(True)
+                self.status_label.setText(f"✅ ローカルWhisper ({model})")
+                self.status_label.setStyleSheet("color: green;")
+            except Exception as e:
+                self.status_label.setText(f"❌ Whisperエラー: {e}")
+                self.status_label.setStyleSheet("color: red;")
+        else:  # API
+            openai_key = self.user_config.openai_api_key
+            if openai_key:
+                try:
+                    from ..transcriber import create_transcriber
+                    self.transcriber = create_transcriber(
+                        provider="openai_api",
+                        api_key=openai_key,
+                        model="whisper-1"
+                    )
+                    self.record_btn.setEnabled(True)
+                    self.status_label.setText("✅ Whisper API")
+                    self.status_label.setStyleSheet("color: green;")
+                except Exception as e:
+                    self.status_label.setText(f"❌ API エラー: {e}")
+                    self.status_label.setStyleSheet("color: red;")
+            else:
+                self.status_label.setText("⚠️ OpenAI APIキーが必要です")
+                self.status_label.setStyleSheet("color: orange;")
     
     def _open_hotkey_settings(self):
         """Open hotkey settings dialog."""

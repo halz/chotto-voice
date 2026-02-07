@@ -11,8 +11,9 @@ anthropic>=0.18.0
 openai>=1.12.0
 google-generativeai>=0.4.0
 
-# Speech-to-text (Whisper API uses openai package)
-# For local whisper later: openai-whisper
+# Speech-to-text
+# Local Whisper (optional - for free local transcription)
+openai-whisper>=20231117
 
 # Utils
 python-dotenv>=1.0.0

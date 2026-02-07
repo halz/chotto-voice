@@ -31,19 +31,34 @@ def main():
     anthropic_key = user_config.anthropic_api_key or settings.anthropic_api_key
     gemini_key = user_config.gemini_api_key
     
-    # Create transcriber
+    # Create transcriber based on user config
     transcriber = None
+    whisper_provider = user_config.whisper_provider  # "local" or "api"
+    
     try:
-        if openai_key:
+        if whisper_provider == "local":
             transcriber = create_transcriber(
-                provider=settings.whisper_provider,
-                api_key=openai_key,
-                model=settings.whisper_model if settings.whisper_provider == "openai_api" 
-                      else settings.whisper_local_model
+                provider="local",
+                model=user_config.whisper_local_model
             )
-    except ValueError as e:
-        print(f"Warning: {e}")
-        print("音声認識が利用できません。設定でAPIキーを確認してください。")
+            print(f"Using local Whisper ({user_config.whisper_local_model})")
+        elif openai_key:
+            transcriber = create_transcriber(
+                provider="openai_api",
+                api_key=openai_key,
+                model="whisper-1"
+            )
+            print("Using OpenAI Whisper API")
+        else:
+            print("Warning: Whisper API selected but no OpenAI key provided")
+            print("Falling back to local Whisper")
+            transcriber = create_transcriber(
+                provider="local",
+                model=user_config.whisper_local_model
+            )
+    except Exception as e:
+        print(f"Warning: Transcriber error: {e}")
+        print("音声認識が利用できません。")
     
     # Create AI client (prefer Gemini=free, then Claude, then OpenAI)
     ai_client = None

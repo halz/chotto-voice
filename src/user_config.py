@@ -41,6 +41,10 @@ class UserConfig:
     anthropic_api_key: str = ""
     gemini_api_key: str = ""
     
+    # Whisper settings
+    whisper_provider: str = "local"  # "local" or "api" - default to free local
+    whisper_local_model: str = "base"  # tiny, base, small, medium, large
+    
     # Hotkey settings
     hotkey: str = "ctrl+shift+space"
     hotkey_double_tap_threshold: float = 0.3
