@@ -239,6 +239,10 @@ class HotkeyManager:
         if was_registered:
             self.start()
     
+    def set_recording_state(self, is_recording: bool):
+        """Set recording state (called from UI when recording starts/stops)."""
+        self._is_recording = is_recording
+    
     @property
     def is_recording(self) -> bool:
         """Check if currently recording."""

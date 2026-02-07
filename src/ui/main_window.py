@@ -613,6 +613,9 @@ class MainWindow(QMainWindow):
         self.tray_icon.setIcon(self._icon_recording)
         self.tray_icon.setToolTip("Chotto Voice 🔴 録音中...")
         self.overlay.set_state("recording")
+        
+        # Sync hotkey manager state
+        self.hotkey_manager.set_recording_state(True)
     
     def _stop_recording(self):
         """Stop recording and process."""
@@ -643,6 +646,9 @@ class MainWindow(QMainWindow):
         self.tray_icon.setIcon(self._icon_normal)
         self.tray_icon.setToolTip("Chotto Voice 🎤")
         self.overlay.set_state("idle")
+        
+        # Sync hotkey manager state
+        self.hotkey_manager.set_recording_state(False)
         
         if audio_data:
             self.status_label.setText("⏳ 処理中...")
