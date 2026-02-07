@@ -265,17 +265,17 @@ class OverlayIndicator(QWidget):
         import math
         self._shake_frame += 1
         
-        # Shake pattern: quick wiggle that settles
-        if self._shake_frame <= 8:
+        # Shake pattern: quick wiggle that settles (shorter)
+        if self._shake_frame <= 4:
             # Shake phase
-            intensity = (8 - self._shake_frame) / 8  # Decreasing intensity
-            self._shake_offset = math.sin(self._shake_frame * 2.5) * 2 * intensity
+            intensity = (4 - self._shake_frame) / 4  # Decreasing intensity
+            self._shake_offset = math.sin(self._shake_frame * 3) * 1.5 * intensity
             # Scale up
-            self._hover_scale = 1.0 + (self._shake_frame / 8) * 0.15
+            self._hover_scale = 1.0 + (self._shake_frame / 4) * 0.1
         else:
             # Settled at larger size
             self._shake_offset = 0
-            self._hover_scale = 1.15
+            self._hover_scale = 1.1
             self._shake_timer.stop()
         
         self.update()
