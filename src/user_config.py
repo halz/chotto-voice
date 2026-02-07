@@ -2,6 +2,9 @@
 
 Persists user settings (hotkey, startup options) to a JSON file.
 Settings are stored in the user's config directory.
+
+NOTE: API keys are NOT stored locally in production mode.
+Only the server access token is stored after Google OAuth login.
 """
 import json
 import sys
@@ -36,21 +39,34 @@ def get_config_path() -> Path:
 class UserConfig:
     """User-configurable settings that persist across sessions."""
     
-    # API Keys (stored in user config, not .env)
-    openai_api_key: str = ""
-    anthropic_api_key: str = ""
-    gemini_api_key: str = ""
+    # === Authentication (Server Mode) ===
+    # Access token from server after Google OAuth login
+    access_token: str = ""
+    user_email: str = ""
+    user_name: str = ""
+    user_id: str = ""
     
-    # Whisper settings
-    whisper_provider: str = "local"  # "local" or "api" - default to free local
+    # Server URL (can be overridden for dev/staging)
+    server_url: str = "https://api.chotto.voice"
+    
+    # === Offline Mode (Development Only) ===
+    # These are only used when offline_mode=True
+    # In production, transcription goes through the server
+    offline_mode: bool = False
+    offline_openai_key: str = ""  # Only for offline dev
+    offline_gemini_key: str = ""  # Only for offline dev
+    offline_anthropic_key: str = ""  # Only for offline dev
+    
+    # Whisper settings (offline mode only)
+    whisper_provider: str = "local"  # "local" or "api"
     whisper_local_model: str = "small"  # tiny, base, small, medium, large
     
-    # Hotkey settings
+    # === Hotkey settings ===
     hotkey: str = "ctrl+shift+space"
     hotkey_double_tap_threshold: float = 0.3
     hotkey_hold_threshold: float = 0.2
     
-    # UI settings
+    # === UI settings ===
     auto_type: bool = True
     process_with_ai: bool = True
     
@@ -58,12 +74,17 @@ class UserConfig:
     # Positions: top-left, top-center, top-right, bottom-left, bottom-center, bottom-right
     overlay_position: str = "bottom-right"
     
-    # Startup settings
+    # === Startup settings ===
     start_with_windows: bool = False
     start_minimized: bool = True
     
     # First run flag
     first_run_complete: bool = False
+    
+    @property
+    def is_logged_in(self) -> bool:
+        """Check if user is logged in (has access token)."""
+        return bool(self.access_token)
     
     @classmethod
     def load(cls) -> "UserConfig":
@@ -96,6 +117,59 @@ class UserConfig:
             if hasattr(self, key):
                 setattr(self, key, value)
         self.save()
+    
+    def set_login(self, access_token: str, user_id: str, email: str, name: str = ""):
+        """Set login credentials after successful OAuth."""
+        self.access_token = access_token
+        self.user_id = user_id
+        self.user_email = email
+        self.user_name = name
+        self.save()
+    
+    def clear_login(self):
+        """Clear login credentials (logout)."""
+        self.access_token = ""
+        self.user_id = ""
+        self.user_email = ""
+        self.user_name = ""
+        self.save()
+    
+    # === Legacy API key properties (for backward compatibility) ===
+    # These redirect to offline_ versions and warn if used in production
+    
+    @property
+    def openai_api_key(self) -> str:
+        """Get OpenAI API key (offline mode only)."""
+        if not self.offline_mode:
+            return ""  # Don't expose in production mode
+        return self.offline_openai_key
+    
+    @openai_api_key.setter
+    def openai_api_key(self, value: str):
+        """Set OpenAI API key (offline mode only)."""
+        self.offline_openai_key = value
+    
+    @property
+    def gemini_api_key(self) -> str:
+        """Get Gemini API key (offline mode only)."""
+        if not self.offline_mode:
+            return ""
+        return self.offline_gemini_key
+    
+    @gemini_api_key.setter
+    def gemini_api_key(self, value: str):
+        self.offline_gemini_key = value
+    
+    @property
+    def anthropic_api_key(self) -> str:
+        """Get Anthropic API key (offline mode only)."""
+        if not self.offline_mode:
+            return ""
+        return self.offline_anthropic_key
+    
+    @anthropic_api_key.setter
+    def anthropic_api_key(self, value: str):
+        self.offline_anthropic_key = value
 
 
 def get_startup_folder() -> Optional[Path]:
