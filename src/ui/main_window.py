@@ -489,6 +489,14 @@ class MainWindow(QMainWindow):
             self.anthropic_key_input.setText(self.user_config.anthropic_api_key)
         api_layout.addRow("Anthropic:", self.anthropic_key_input)
         
+        # Google Gemini API Key
+        self.gemini_key_input = QLineEdit()
+        self.gemini_key_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.gemini_key_input.setPlaceholderText("AIza...")
+        if self.user_config.gemini_api_key:
+            self.gemini_key_input.setText(self.user_config.gemini_api_key)
+        api_layout.addRow("Gemini:", self.gemini_key_input)
+        
         # Save button
         save_keys_btn = QPushButton("💾 APIキー保存")
         save_keys_btn.clicked.connect(self._save_api_keys)
@@ -771,11 +779,13 @@ class MainWindow(QMainWindow):
         """Save API keys and reinitialize clients."""
         openai_key = self.openai_key_input.text().strip()
         anthropic_key = self.anthropic_key_input.text().strip()
+        gemini_key = self.gemini_key_input.text().strip()
         
         # Save to config
         self.user_config.update(
             openai_api_key=openai_key,
-            anthropic_api_key=anthropic_key
+            anthropic_api_key=anthropic_key,
+            gemini_api_key=gemini_key
         )
         
         # Reinitialize transcriber if OpenAI key provided
@@ -794,8 +804,22 @@ class MainWindow(QMainWindow):
                 self.status_label.setText(f"❌ Transcriber初期化エラー: {e}")
                 self.status_label.setStyleSheet("color: red;")
         
-        # Reinitialize AI client (prefer Anthropic, fallback to OpenAI)
-        if anthropic_key:
+        # Reinitialize AI client (prefer Gemini=free, then Anthropic, then OpenAI)
+        self.ai_client = None
+        if gemini_key:
+            try:
+                from ..ai_client import create_ai_client
+                self.ai_client = create_ai_client(
+                    provider="gemini",
+                    api_key=gemini_key,
+                    model="gemini-2.0-flash"
+                )
+                self.ai_process_check.setEnabled(True)
+                print("AI client: Google Gemini")
+            except Exception as e:
+                print(f"Gemini client error: {e}")
+        
+        if not self.ai_client and anthropic_key:
             try:
                 from ..ai_client import create_ai_client
                 self.ai_client = create_ai_client(
@@ -807,7 +831,8 @@ class MainWindow(QMainWindow):
                 print("AI client: Claude")
             except Exception as e:
                 print(f"Claude client error: {e}")
-        elif openai_key:
+        
+        if not self.ai_client and openai_key:
             try:
                 from ..ai_client import create_ai_client
                 self.ai_client = create_ai_client(

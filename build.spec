@@ -18,6 +18,8 @@ a = Analysis(
         'numpy',
         'anthropic',
         'openai',
+        'google.generativeai',
+        'google.ai.generativelanguage',
         'keyboard',
         'pyperclip',
         'pydantic',

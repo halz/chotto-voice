@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, Generator
 import anthropic
 import openai
+import google.generativeai as genai
 
 
 class AIClient(ABC):
@@ -127,6 +128,62 @@ class OpenAIClient(AIClient):
                 yield chunk.choices[0].delta.content
 
 
+class GeminiClient(AIClient):
+    """AI client using Google Gemini API."""
+    
+    DEFAULT_SYSTEM_PROMPT = """音声入力テキストを最小限の整形で出力してください。
+
+処理すること：
+- 文頭・文中のフィラーのみ除去（「えー」「えーと」「あのー」「うーん」「まあ」）
+- 句読点を適切に追加
+
+絶対にしないこと：
+- 内容を要約・短縮しない
+- 言い回しを変えない
+- 単語を削除しない（フィラー以外）
+- 文章構造を変えない
+- 返答・回答・説明を追加しない
+
+整形結果のみを出力。"""
+    
+    def __init__(self, api_key: str, model: str = "gemini-2.0-flash"):
+        genai.configure(api_key=api_key)
+        self.model = genai.GenerativeModel(
+            model_name=model,
+            system_instruction=self.DEFAULT_SYSTEM_PROMPT
+        )
+    
+    def process(self, text: str, system_prompt: Optional[str] = None) -> str:
+        """Process text through Gemini."""
+        if system_prompt:
+            model = genai.GenerativeModel(
+                model_name=self.model.model_name,
+                system_instruction=system_prompt
+            )
+            response = model.generate_content(text)
+        else:
+            response = self.model.generate_content(text)
+        return response.text
+    
+    def process_stream(
+        self, 
+        text: str, 
+        system_prompt: Optional[str] = None
+    ) -> Generator[str, None, None]:
+        """Process text through Gemini with streaming."""
+        if system_prompt:
+            model = genai.GenerativeModel(
+                model_name=self.model.model_name,
+                system_instruction=system_prompt
+            )
+            response = model.generate_content(text, stream=True)
+        else:
+            response = self.model.generate_content(text, stream=True)
+        for chunk in response:
+            if chunk.text:
+                yield chunk.text
+
+
 def create_ai_client(
     provider: str,
     api_key: str,
@@ -137,5 +194,7 @@ def create_ai_client(
         return ClaudeClient(api_key, model or "claude-sonnet-4-20250514")
     elif provider == "openai":
         return OpenAIClient(api_key, model or "gpt-4o")
+    elif provider == "gemini":
+        return GeminiClient(api_key, model or "gemini-2.0-flash")
     else:
         raise ValueError(f"Unknown AI provider: {provider}")

@@ -29,6 +29,7 @@ def main():
     # Get API keys (user_config takes priority over .env)
     openai_key = user_config.openai_api_key or settings.openai_api_key
     anthropic_key = user_config.anthropic_api_key or settings.anthropic_api_key
+    gemini_key = user_config.gemini_api_key
     
     # Create transcriber
     transcriber = None
@@ -44,10 +45,17 @@ def main():
         print(f"Warning: {e}")
         print("音声認識が利用できません。設定でAPIキーを確認してください。")
     
-    # Create AI client (try preferred provider, fallback to available)
+    # Create AI client (prefer Gemini=free, then Claude, then OpenAI)
     ai_client = None
     try:
-        if anthropic_key:
+        if gemini_key:
+            ai_client = create_ai_client(
+                provider="gemini",
+                api_key=gemini_key,
+                model="gemini-2.0-flash"
+            )
+            print("Using Google Gemini for AI processing")
+        elif anthropic_key:
             ai_client = create_ai_client(
                 provider="claude",
                 api_key=anthropic_key,
