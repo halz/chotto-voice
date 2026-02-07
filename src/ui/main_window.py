@@ -630,34 +630,25 @@ class MainWindow(QMainWindow):
             color: #adb5bd;
         }
         QWidget#posGrid {
-            background: #1a1f2e;
-            border-radius: 12px;
-            border: 1px solid #2d3548;
+            background: #e9ecef;
+            border-radius: 8px;
         }
         QPushButton#posBtn {
-            border: 1px solid #3d4760;
-            border-radius: 8px;
-            background: #252d3d;
-            min-width: 80px;
-            min-height: 60px;
-            font-size: 11px;
-            color: #6c7a96;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            background: #ffffff;
+            font-size: 10px;
+            color: #495057;
+            padding: 4px;
         }
         QPushButton#posBtn:hover {
-            background: #2d3548;
-            border-color: #4a5875;
+            background: #f8f9fa;
+            border-color: #adb5bd;
         }
         QPushButton#posBtn:checked {
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1a4d3e, stop:1 #0d2e24);
-            border: 2px solid #22c55e;
-            color: #22c55e;
-        }
-        QLabel#posStatus {
-            background: #252d3d;
-            border-radius: 20px;
-            padding: 8px 20px;
-            color: #6c7a96;
-            font-size: 13px;
+            background: #228be6;
+            border-color: #1971c2;
+            color: white;
         }
         QLineEdit#hotkeyInput {
             padding: 10px 14px;
@@ -814,7 +805,7 @@ class MainWindow(QMainWindow):
     def _setup_ui(self):
         """Setup the user interface with sidebar navigation."""
         self.setWindowTitle("Chotto Voice")
-        self.setFixedSize(600, 480)
+        self.setFixedSize(580, 520)
         self.setStyleSheet(self.STYLE)
         self.setWindowFlags(
             Qt.WindowType.Window |
@@ -916,37 +907,31 @@ class MainWindow(QMainWindow):
             self.startup_check.toggled.connect(self._on_startup_changed)
             layout.addWidget(self.startup_check)
         
-        layout.addSpacing(16)
+        layout.addSpacing(12)
         
         # Overlay position (visual grid)
         overlay_label = QLabel("インジケーター位置")
         overlay_label.setObjectName("sectionTitle")
         layout.addWidget(overlay_label)
         
-        pos_hint = QLabel("画面上の表示位置をクリックして選択")
-        pos_hint.setObjectName("hint")
-        layout.addWidget(pos_hint)
-        
-        layout.addSpacing(8)
-        
-        # Create position grid
+        # Create position grid (compact)
         from PyQt6.QtWidgets import QGridLayout, QButtonGroup
         pos_container = QWidget()
         pos_container.setObjectName("posGrid")
-        pos_container.setFixedSize(280, 160)
+        pos_container.setFixedSize(200, 70)
         pos_grid = QGridLayout(pos_container)
-        pos_grid.setSpacing(8)
-        pos_grid.setContentsMargins(12, 12, 12, 12)
+        pos_grid.setSpacing(4)
+        pos_grid.setContentsMargins(6, 6, 6, 6)
         
         self.pos_buttons = {}
         self.pos_button_group = QButtonGroup(self)
         positions = [
-            ("top-left", "🎤\n左上", 0, 0), 
-            ("top-center", "🎤\n上中央", 0, 1), 
-            ("top-right", "🎤\n右上", 0, 2),
-            ("bottom-left", "🎤\n左下", 1, 0), 
-            ("bottom-center", "🎤\n下中央", 1, 1), 
-            ("bottom-right", "🎤\n右下", 1, 2)
+            ("top-left", "左上", 0, 0), 
+            ("top-center", "中央", 0, 1), 
+            ("top-right", "右上", 0, 2),
+            ("bottom-left", "左下", 1, 0), 
+            ("bottom-center", "中央", 1, 1), 
+            ("bottom-right", "右下", 1, 2)
         ]
         
         current_pos = self.user_config.overlay_position
@@ -954,6 +939,7 @@ class MainWindow(QMainWindow):
             btn = QPushButton(label)
             btn.setObjectName("posBtn")
             btn.setCheckable(True)
+            btn.setFixedSize(60, 26)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             if pos_key == current_pos:
                 btn.setChecked(True)
@@ -964,15 +950,10 @@ class MainWindow(QMainWindow):
         
         layout.addWidget(pos_container)
         
-        # Status label
-        self.pos_status_label = QLabel(f"🎤 {self._get_pos_label(current_pos)} に配置中")
-        self.pos_status_label.setObjectName("posStatus")
-        self.pos_status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.pos_status_label)
-        
         # Keep combo hidden for compatibility
         self.overlay_position_combo = QComboBox()
         self.overlay_position_combo.hide()
+        self.pos_status_label = QLabel()  # Hidden, for compatibility
         
         layout.addSpacing(16)
         
@@ -1136,7 +1117,6 @@ class MainWindow(QMainWindow):
         """Handle position button click."""
         self.overlay.set_position(position)
         self.user_config.update(overlay_position=position)
-        self.pos_status_label.setText(f"🎤 {self._get_pos_label(position)} に配置中")
     
     def _get_pos_label(self, pos: str) -> str:
         """Get Japanese label for position."""
