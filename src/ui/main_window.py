@@ -291,27 +291,29 @@ class FirstRunSetupDialog(QDialog):
             text-decoration: underline;
         }
         QPushButton#primary {
-            background-color: #4A90D9;
-            color: white;
+            background-color: #2563eb;
+            color: #ffffff;
             border: none;
             border-radius: 8px;
-            padding: 12px 24px;
+            padding: 12px 32px;
             font-size: 14px;
             font-weight: 600;
+            min-width: 100px;
         }
         QPushButton#primary:hover {
-            background-color: #357ABD;
+            background-color: #1d4ed8;
         }
         QPushButton#secondary {
-            background-color: transparent;
-            color: #666;
-            border: 1px solid #ddd;
+            background-color: #f3f4f6;
+            color: #374151;
+            border: 1px solid #d1d5db;
             border-radius: 8px;
             padding: 12px 24px;
             font-size: 14px;
+            min-width: 80px;
         }
         QPushButton#secondary:hover {
-            background-color: #f0f0f0;
+            background-color: #e5e7eb;
         }
     """
     
