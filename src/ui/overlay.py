@@ -1,6 +1,6 @@
 """Overlay indicator for Chotto Voice - iOS-style recording indicator."""
 from PyQt6.QtWidgets import QWidget, QApplication
-from PyQt6.QtCore import Qt, QTimer, QRectF, QPointF
+from PyQt6.QtCore import Qt, QTimer, QRectF, QPointF, QPropertyAnimation, QEasingCurve, pyqtProperty
 from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QFont, QPainterPath
 import time
 import random
@@ -9,11 +9,11 @@ import random
 class OverlayIndicator(QWidget):
     """iOS-style overlay indicator in bottom-right corner."""
     
-    # Sizes
-    IDLE_WIDTH = 60
-    IDLE_HEIGHT = 30
-    RECORDING_WIDTH = 280
-    RECORDING_HEIGHT = 44
+    # Sizes (smaller)
+    IDLE_WIDTH = 44
+    IDLE_HEIGHT = 22
+    RECORDING_WIDTH = 220
+    RECORDING_HEIGHT = 36
     
     # Colors
     BG_COLOR = QColor(45, 45, 48, 230)  # Dark gray, slightly transparent
@@ -28,15 +28,41 @@ class OverlayIndicator(QWidget):
         super().__init__()
         self._state = "idle"  # idle, recording, processing
         self._recording_start_time = 0
-        self._audio_levels = [0.1] * 40  # Waveform data
-        self._current_width = self.IDLE_WIDTH
-        self._current_height = self.IDLE_HEIGHT
+        self._audio_levels = [0.1] * 30  # Waveform data (fewer bars for smaller size)
+        self._current_width = float(self.IDLE_WIDTH)
+        self._current_height = float(self.IDLE_HEIGHT)
+        self._target_width = float(self.IDLE_WIDTH)
+        self._target_height = float(self.IDLE_HEIGHT)
         self._pulse_opacity = 1.0
         self._pulse_direction = -1
         
         self._setup_window()
         self._setup_timers()
+        self._setup_animations()
         self._position_window()
+    
+    # Properties for animation
+    @pyqtProperty(float)
+    def animatedWidth(self):
+        return self._current_width
+    
+    @animatedWidth.setter
+    def animatedWidth(self, value):
+        self._current_width = value
+        self.setFixedSize(int(self._current_width), int(self._current_height))
+        self._position_window()
+        self.update()
+    
+    @pyqtProperty(float)
+    def animatedHeight(self):
+        return self._current_height
+    
+    @animatedHeight.setter
+    def animatedHeight(self, value):
+        self._current_height = value
+        self.setFixedSize(int(self._current_width), int(self._current_height))
+        self._position_window()
+        self.update()
     
     def _setup_window(self):
         """Configure window properties."""
@@ -48,7 +74,7 @@ class OverlayIndicator(QWidget):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
-        self._update_size()
+        self.setFixedSize(int(self._current_width), int(self._current_height))
     
     def _setup_timers(self):
         """Setup animation timers."""
@@ -67,25 +93,54 @@ class OverlayIndicator(QWidget):
         self._pulse_timer.timeout.connect(self._update_pulse)
         self._pulse_timer.setInterval(50)
     
-    def _update_size(self):
-        """Update widget size based on state."""
-        if self._state == "idle":
-            self._current_width = self.IDLE_WIDTH
-            self._current_height = self.IDLE_HEIGHT
-        else:
-            self._current_width = self.RECORDING_WIDTH
-            self._current_height = self.RECORDING_HEIGHT
+    def _setup_animations(self):
+        """Setup size transition animations."""
+        # Width animation
+        self._width_anim = QPropertyAnimation(self, b"animatedWidth")
+        self._width_anim.setDuration(200)  # 200ms
+        self._width_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
         
-        self.setFixedSize(self._current_width, self._current_height)
-        self._position_window()
+        # Height animation
+        self._height_anim = QPropertyAnimation(self, b"animatedHeight")
+        self._height_anim.setDuration(200)  # 200ms
+        self._height_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+    
+    def _update_size(self, animate: bool = True):
+        """Update widget size based on state with optional animation."""
+        if self._state == "idle":
+            target_width = float(self.IDLE_WIDTH)
+            target_height = float(self.IDLE_HEIGHT)
+        else:
+            target_width = float(self.RECORDING_WIDTH)
+            target_height = float(self.RECORDING_HEIGHT)
+        
+        if animate and (target_width != self._current_width or target_height != self._current_height):
+            # Animate size change
+            self._width_anim.stop()
+            self._height_anim.stop()
+            
+            self._width_anim.setStartValue(self._current_width)
+            self._width_anim.setEndValue(target_width)
+            
+            self._height_anim.setStartValue(self._current_height)
+            self._height_anim.setEndValue(target_height)
+            
+            self._width_anim.start()
+            self._height_anim.start()
+        else:
+            # Set immediately (for initial setup)
+            self._current_width = target_width
+            self._current_height = target_height
+            self.setFixedSize(int(self._current_width), int(self._current_height))
+            self._position_window()
     
     def _position_window(self):
         """Position window in bottom-right corner."""
         screen = QApplication.primaryScreen()
         if screen:
             geometry = screen.availableGeometry()
-            x = geometry.right() - self._current_width - 20  # 20px margin
-            y = geometry.bottom() - self._current_height - 20
+            x = geometry.right() - int(self._current_width) - 20  # 20px margin
+            y = geometry.bottom() - int(self._current_height) - 20
             self.move(x, y)
     
     def _update_timer(self):
@@ -173,7 +228,7 @@ class OverlayIndicator(QWidget):
         painter.drawPath(path)
         
         # Draw center dot
-        dot_size = 8
+        dot_size = 6
         dot_x = (self._current_width - dot_size) / 2
         dot_y = (self._current_height - dot_size) / 2
         painter.setBrush(QBrush(self.IDLE_DOT_COLOR))
@@ -191,7 +246,7 @@ class OverlayIndicator(QWidget):
         painter.drawPath(path)
         
         # Draw microphone icon with red background
-        mic_margin = 6
+        mic_margin = 4
         mic_size = self._current_height - mic_margin * 2
         mic_x = mic_margin
         mic_y = mic_margin
@@ -201,17 +256,17 @@ class OverlayIndicator(QWidget):
         painter.drawEllipse(QRectF(mic_x, mic_y, mic_size, mic_size))
         
         # Microphone icon (simplified)
-        painter.setPen(QPen(self.MIC_ICON_COLOR, 2))
+        painter.setPen(QPen(self.MIC_ICON_COLOR, 1.5))
         painter.setBrush(Qt.BrushStyle.NoBrush)
         mic_center_x = mic_x + mic_size / 2
         mic_center_y = mic_y + mic_size / 2
         
         # Mic body (rounded rectangle)
-        mic_body_w = mic_size * 0.3
-        mic_body_h = mic_size * 0.45
+        mic_body_w = mic_size * 0.28
+        mic_body_h = mic_size * 0.4
         mic_body_rect = QRectF(
             mic_center_x - mic_body_w / 2,
-            mic_center_y - mic_body_h / 2 - 2,
+            mic_center_y - mic_body_h / 2 - 1,
             mic_body_w,
             mic_body_h
         )
@@ -219,26 +274,26 @@ class OverlayIndicator(QWidget):
         
         # Mic stand arc
         arc_rect = QRectF(
-            mic_center_x - mic_size * 0.25,
-            mic_center_y - mic_size * 0.15,
-            mic_size * 0.5,
-            mic_size * 0.4
+            mic_center_x - mic_size * 0.22,
+            mic_center_y - mic_size * 0.1,
+            mic_size * 0.44,
+            mic_size * 0.35
         )
         painter.drawArc(arc_rect, 0, -180 * 16)
         
         # Mic stand line
         painter.drawLine(
-            QPointF(mic_center_x, mic_center_y + mic_size * 0.25),
-            QPointF(mic_center_x, mic_center_y + mic_size * 0.35)
+            QPointF(mic_center_x, mic_center_y + mic_size * 0.22),
+            QPointF(mic_center_x, mic_center_y + mic_size * 0.32)
         )
         
         # Draw waveform
-        waveform_start = mic_x + mic_size + 12
-        waveform_end = self._current_width - 55
+        waveform_start = mic_x + mic_size + 8
+        waveform_end = self._current_width - 42
         waveform_width = waveform_end - waveform_start
         bar_count = len(self._audio_levels)
         bar_width = 2
-        bar_spacing = (waveform_width - bar_count * bar_width) / (bar_count - 1)
+        bar_spacing = max(1, (waveform_width - bar_count * bar_width) / max(1, bar_count - 1))
         
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QBrush(self.WAVEFORM_COLOR))
@@ -249,17 +304,19 @@ class OverlayIndicator(QWidget):
         for i, level in enumerate(self._audio_levels):
             bar_height = max(2, level * max_bar_height)
             bar_x = waveform_start + i * (bar_width + bar_spacing)
+            if bar_x + bar_width > waveform_end:
+                break
             bar_y = center_y - bar_height / 2
             painter.drawRoundedRect(QRectF(bar_x, bar_y, bar_width, bar_height), 1, 1)
         
         # Draw timer
         painter.setPen(QPen(self.TIMER_COLOR))
-        font = QFont("SF Pro", 13)
+        font = QFont("SF Pro", 11)
         font.setWeight(QFont.Weight.Medium)
         painter.setFont(font)
         
         time_str = self._get_recording_time()
-        timer_rect = QRectF(self._current_width - 50, 0, 45, self._current_height)
+        timer_rect = QRectF(self._current_width - 40, 0, 36, self._current_height)
         painter.drawText(timer_rect, Qt.AlignmentFlag.AlignCenter, time_str)
     
     def _draw_processing(self, painter: QPainter):
@@ -274,7 +331,7 @@ class OverlayIndicator(QWidget):
         painter.drawPath(path)
         
         # Draw processing icon with orange background (pulsing)
-        mic_margin = 6
+        mic_margin = 4
         mic_size = self._current_height - mic_margin * 2
         mic_x = mic_margin
         mic_y = mic_margin
@@ -287,10 +344,10 @@ class OverlayIndicator(QWidget):
         
         # Processing dots
         painter.setBrush(QBrush(self.MIC_ICON_COLOR))
-        dot_size = 4
+        dot_size = 3
         mic_center_x = mic_x + mic_size / 2
         mic_center_y = mic_y + mic_size / 2
-        spacing = 6
+        spacing = 5
         
         for i in range(3):
             dx = (i - 1) * spacing
@@ -302,11 +359,11 @@ class OverlayIndicator(QWidget):
         
         # Draw "処理中..." text
         painter.setPen(QPen(self.TIMER_COLOR))
-        font = QFont("SF Pro", 13)
+        font = QFont("SF Pro", 11)
         font.setWeight(QFont.Weight.Medium)
         painter.setFont(font)
         
-        text_rect = QRectF(mic_x + mic_size + 10, 0, self._current_width - mic_size - 30, self._current_height)
+        text_rect = QRectF(mic_x + mic_size + 8, 0, self._current_width - mic_size - 20, self._current_height)
         painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, "処理中...")
     
     def show_indicator(self):
