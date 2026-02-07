@@ -796,7 +796,7 @@ class MainWindow(QMainWindow):
                 self.status_label.setText(f"❌ Transcriber初期化エラー: {e}")
                 self.status_label.setStyleSheet("color: red;")
         
-        # Reinitialize AI client if Anthropic key provided
+        # Reinitialize AI client (prefer Anthropic, fallback to OpenAI)
         if anthropic_key:
             try:
                 from ..ai_client import create_ai_client
@@ -806,6 +806,19 @@ class MainWindow(QMainWindow):
                     model="claude-sonnet-4-20250514"
                 )
                 self.ai_process_check.setEnabled(True)
+                print("AI client: Claude")
+            except Exception as e:
+                print(f"Claude client error: {e}")
+        elif openai_key:
+            try:
+                from ..ai_client import create_ai_client
+                self.ai_client = create_ai_client(
+                    provider="openai",
+                    api_key=openai_key,
+                    model="gpt-4o"
+                )
+                self.ai_process_check.setEnabled(True)
+                print("AI client: OpenAI GPT")
             except Exception as e:
                 print(f"AI client error: {e}")
         

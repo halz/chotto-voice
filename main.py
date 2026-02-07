@@ -44,21 +44,23 @@ def main():
         print(f"Warning: {e}")
         print("音声認識が利用できません。設定でAPIキーを確認してください。")
     
-    # Create AI client
+    # Create AI client (try preferred provider, fallback to available)
     ai_client = None
     try:
-        if settings.ai_provider == "claude" and anthropic_key:
+        if anthropic_key:
             ai_client = create_ai_client(
                 provider="claude",
                 api_key=anthropic_key,
                 model=settings.claude_model
             )
-        elif settings.ai_provider == "openai" and openai_key:
+            print("Using Claude for AI processing")
+        elif openai_key:
             ai_client = create_ai_client(
                 provider="openai",
                 api_key=openai_key,
                 model=settings.openai_model
             )
+            print("Using OpenAI GPT for AI processing")
     except Exception as e:
         print(f"Warning: AI client error: {e}")
     
