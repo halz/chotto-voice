@@ -50,7 +50,11 @@ class HotkeyManager:
         if self._registered:
             return
         
-        key = self.config.key.lower()
+        key = self.config.key.lower().strip()
+        
+        print(f"[Hotkey] Starting with key: '{key}'")
+        print(f"[Hotkey] SINGLE_MODIFIER_KEYS: {SINGLE_MODIFIER_KEYS}")
+        print(f"[Hotkey] Is single modifier: {key in SINGLE_MODIFIER_KEYS}")
         
         # Check if this is a single modifier key (needs special handling)
         if key in SINGLE_MODIFIER_KEYS:
