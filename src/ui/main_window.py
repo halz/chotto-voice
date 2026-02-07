@@ -410,6 +410,13 @@ class TranscriptionWorker(QThread):
     
     def run(self):
         try:
+            # Check for silence first
+            from ..audio import AudioRecorder
+            if not AudioRecorder.check_audio_has_speech(self.audio_data):
+                print("[Worker] Audio too quiet (silence detected), skipping", flush=True)
+                self.finished.emit("")
+                return
+            
             # Step 1: Transcribe
             print(f"[Worker] Transcribing audio ({len(self.audio_data)} bytes)...", flush=True)
             text = self.transcriber.transcribe(self.audio_data)

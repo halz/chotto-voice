@@ -83,6 +83,44 @@ class AudioRecorder:
         
         return wav_buffer.getvalue()
     
+    def get_audio_level(self) -> float:
+        """Get the average audio level of recorded frames (0.0-1.0)."""
+        with self._lock:
+            if not self._frames:
+                return 0.0
+            audio_data = np.concatenate(self._frames, axis=0)
+            return float(np.abs(audio_data).mean())
+    
+    @staticmethod
+    def check_audio_has_speech(wav_bytes: bytes, threshold: float = 0.01) -> bool:
+        """Check if WAV audio contains speech (not just silence).
+        
+        Args:
+            wav_bytes: WAV file as bytes
+            threshold: Minimum average amplitude to consider as speech
+            
+        Returns:
+            True if audio likely contains speech
+        """
+        if not wav_bytes or len(wav_bytes) < 1000:
+            return False
+        
+        try:
+            wav_buffer = io.BytesIO(wav_bytes)
+            with wave.open(wav_buffer, "rb") as wav_file:
+                frames = wav_file.readframes(wav_file.getnframes())
+                audio_data = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32767
+                
+                # Check average amplitude
+                avg_level = np.abs(audio_data).mean()
+                
+                # Also check if there's variation (not just constant noise)
+                std_level = np.std(audio_data)
+                
+                return avg_level > threshold and std_level > threshold * 0.5
+        except Exception:
+            return True  # If we can't check, assume it's valid
+    
     @property
     def is_recording(self) -> bool:
         """Check if currently recording."""
