@@ -644,6 +644,8 @@ class MainWindow(QMainWindow):
         """Update audio level indicator."""
         scaled = min(int(level * 1000), 100)
         self.level_bar.setValue(scaled)
+        # Also update overlay waveform
+        self.overlay.set_audio_level(level * 10)  # Scale for visibility
     
     def _on_transcription_done(self, text: str):
         """Handle transcription completion."""
