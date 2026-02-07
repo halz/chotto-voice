@@ -153,11 +153,24 @@ class GeminiClient(AIClient):
     def process(self, text: str, system_prompt: Optional[str] = None) -> str:
         """Process text through Gemini."""
         prompt = system_prompt or self.DEFAULT_SYSTEM_PROMPT
-        response = self.client.models.generate_content(
-            model=self.model_name,
-            contents=f"{prompt}\n\n{text}"
-        )
-        return response.text
+        full_prompt = f"{prompt}\n\n入力テキスト:\n{text}"
+        
+        try:
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=full_prompt
+            )
+            print(f"[Gemini] Response type: {type(response)}", flush=True)
+            if hasattr(response, 'text'):
+                return response.text
+            elif hasattr(response, 'candidates') and response.candidates:
+                return response.candidates[0].content.parts[0].text
+            else:
+                print(f"[Gemini] Unknown response: {response}", flush=True)
+                return text  # Return original if failed
+        except Exception as e:
+            print(f"[Gemini] Error: {e}", flush=True)
+            return text
     
     def process_stream(
         self, 
@@ -166,13 +179,30 @@ class GeminiClient(AIClient):
     ) -> Generator[str, None, None]:
         """Process text through Gemini with streaming."""
         prompt = system_prompt or self.DEFAULT_SYSTEM_PROMPT
-        response = self.client.models.generate_content_stream(
-            model=self.model_name,
-            contents=f"{prompt}\n\n{text}"
-        )
-        for chunk in response:
-            if chunk.text:
-                yield chunk.text
+        full_prompt = f"{prompt}\n\n入力テキスト:\n{text}"
+        
+        try:
+            response = self.client.models.generate_content_stream(
+                model=self.model_name,
+                contents=full_prompt
+            )
+            for chunk in response:
+                if hasattr(chunk, 'text') and chunk.text:
+                    yield chunk.text
+        except Exception as e:
+            print(f"[Gemini] Stream error: {e}", flush=True)
+            # Fallback to non-streaming
+            try:
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=full_prompt
+                )
+                if hasattr(response, 'text') and response.text:
+                    yield response.text
+                else:
+                    print(f"[Gemini] Response: {response}", flush=True)
+            except Exception as e2:
+                print(f"[Gemini] Fallback error: {e2}", flush=True)
 
 
 def create_ai_client(
