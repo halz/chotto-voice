@@ -110,7 +110,8 @@ class HotkeyManager:
                         debug_print(f"[Hotkey] Release detected: '{event_key}', elapsed: {elapsed:.3f}s")
                         
                         # Check if it was a valid tap (not too short, not too long)
-                        if 0.05 < elapsed < self._modifier_tap_threshold:
+                        # Lower threshold (0.02s) for more responsive single-tap stop
+                        if 0.02 < elapsed < self._modifier_tap_threshold:
                             current_time = time.time()
                             time_since_last_tap = current_time - self._last_tap_time
                             
