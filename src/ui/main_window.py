@@ -645,16 +645,14 @@ class MainWindow(QMainWindow):
         """)
         self.level_bar.setValue(0)
         
-        # Update tray and overlay
+        # Update tray
         self.tray_record_action.setText("🎤 録音開始")
-        self.tray_icon.setIcon(self._icon_normal)
-        self.tray_icon.setToolTip("Chotto Voice 🎤")
-        self.overlay.set_state("idle")
         
         # Sync hotkey manager state
         self.hotkey_manager.set_recording_state(False)
         
         if audio_data:
+            # Go directly to processing state (skip idle to avoid animation glitch)
             self.status_label.setText("⏳ 処理中...")
             self.status_label.setStyleSheet("color: orange;")
             self.record_btn.setEnabled(False)
@@ -675,6 +673,10 @@ class MainWindow(QMainWindow):
             self._worker.error.connect(self._on_error)
             self._worker.start()
         else:
+            # No audio data - go to idle state
+            self.tray_icon.setIcon(self._icon_normal)
+            self.tray_icon.setToolTip("Chotto Voice 🎤")
+            self.overlay.set_state("idle")
             self.status_label.setText("音声が検出されませんでした")
             self.status_label.setStyleSheet("color: gray;")
     
