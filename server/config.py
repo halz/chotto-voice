@@ -36,9 +36,13 @@ class Settings(BaseSettings):
     allowed_origins: list[str] = ["http://localhost", "https://chotto.voice"]
     
     class Config:
+        # Vercel uses environment variables directly, not .env files
         env_file = "server/.env"
         env_file_encoding = "utf-8"
         extra = "ignore"  # Ignore extra fields from parent .env
+        
+        # Allow env vars to override .env file
+        env_priority = "first"
 
 
 @lru_cache
