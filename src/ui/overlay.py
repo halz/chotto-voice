@@ -125,6 +125,12 @@ class OverlayIndicator(QWidget):
         self._shake_timer.timeout.connect(self._update_shake)
         self._shake_timer.setInterval(30)
         self._shake_frame = 0
+        
+        # Always-on-top enforcement timer (every 500ms)
+        self._topmost_timer = QTimer(self)
+        self._topmost_timer.timeout.connect(self._enforce_topmost)
+        self._topmost_timer.setInterval(500)
+        self._topmost_timer.start()
     
     def _setup_animations(self):
         """Setup size transition animations."""
@@ -279,6 +285,11 @@ class OverlayIndicator(QWidget):
             self._shake_timer.stop()
         
         self.update()
+    
+    def _enforce_topmost(self):
+        """Enforce always-on-top by raising the window periodically."""
+        if self.isVisible():
+            self.raise_()
     
     def enterEvent(self, event):
         """Handle mouse enter - start hover animation."""
