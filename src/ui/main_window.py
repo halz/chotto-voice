@@ -630,26 +630,26 @@ class MainWindow(QMainWindow):
             color: #adb5bd;
         }
         QWidget#posGrid {
-            background: #e9ecef;
+            background: #343a40;
             border-radius: 8px;
+            border: 2px solid #495057;
         }
         QPushButton#posBtn {
-            border: 1px solid #ced4da;
-            border-radius: 4px;
-            background: #ffffff;
-            font-size: 14px;
-            color: #adb5bd;
-            padding: 4px;
+            border: none;
+            border-radius: 3px;
+            background: transparent;
+            font-size: 10px;
+            color: #6c757d;
+            padding: 2px;
         }
         QPushButton#posBtn:hover {
-            background: #f8f9fa;
-            border-color: #adb5bd;
-            color: #495057;
+            background: rgba(255, 255, 255, 0.1);
+            color: #adb5bd;
         }
         QPushButton#posBtn:checked {
-            background: #228be6;
-            border-color: #1971c2;
-            color: white;
+            background: transparent;
+            color: #228be6;
+            font-size: 12px;
         }
         QLineEdit#hotkeyInput {
             padding: 10px 14px;
@@ -808,7 +808,7 @@ class MainWindow(QMainWindow):
     def _setup_ui(self):
         """Setup the user interface with sidebar navigation."""
         self.setWindowTitle("Chotto Voice")
-        self.setFixedSize(580, 520)
+        self.setFixedSize(580, 580)
         self.setStyleSheet(self.STYLE)
         self.setWindowFlags(
             Qt.WindowType.Window |
@@ -921,14 +921,14 @@ class MainWindow(QMainWindow):
         overlay_label.setObjectName("sectionTitle")
         layout.addWidget(overlay_label)
         
-        # Create position grid (compact)
+        # Create position grid (visual representation of screen)
         from PyQt6.QtWidgets import QGridLayout, QButtonGroup
         pos_container = QWidget()
         pos_container.setObjectName("posGrid")
-        pos_container.setFixedSize(156, 70)
+        pos_container.setFixedSize(180, 80)
         pos_grid = QGridLayout(pos_container)
         pos_grid.setSpacing(4)
-        pos_grid.setContentsMargins(6, 6, 6, 6)
+        pos_grid.setContentsMargins(8, 8, 8, 8)
         
         self.pos_buttons = {}
         self.pos_button_group = QButtonGroup(self)
@@ -943,10 +943,10 @@ class MainWindow(QMainWindow):
         
         current_pos = self.user_config.overlay_position
         for pos_key, row, col in positions:
-            btn = QPushButton("🎤")
+            btn = QPushButton("●")
             btn.setObjectName("posBtn")
             btn.setCheckable(True)
-            btn.setFixedSize(46, 28)
+            btn.setFixedSize(52, 32)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             if pos_key == current_pos:
                 btn.setChecked(True)
@@ -956,6 +956,10 @@ class MainWindow(QMainWindow):
             pos_grid.addWidget(btn, row, col)
         
         layout.addWidget(pos_container)
+        
+        pos_hint = QLabel("画面上の表示位置を選択")
+        pos_hint.setObjectName("hint")
+        layout.addWidget(pos_hint)
         
         # Keep combo hidden for compatibility
         self.overlay_position_combo = QComboBox()
