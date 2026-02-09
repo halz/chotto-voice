@@ -1,6 +1,6 @@
 # Chotto Voice 🎤
 
-Windows向け音声入力アシスタント - Aqua Voiceの代替アプリケーション
+Windows / macOS 向け音声入力アシスタント - Aqua Voiceの代替アプリケーション
 
 ## 機能
 

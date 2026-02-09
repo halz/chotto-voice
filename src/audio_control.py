@@ -308,8 +308,128 @@ class WindowsAudioController(AudioController):
             return False
 
 
+class MacAudioController(AudioController):
+    """Audio controller for macOS using osascript/AppleScript."""
+    
+    def __init__(self):
+        import subprocess
+        self._subprocess = subprocess
+        self._saved_volume: float = 1.0
+        self._fade_thread = None
+    
+    def _run_osascript(self, script: str) -> str:
+        """Run AppleScript and return output."""
+        try:
+            result = self._subprocess.run(
+                ['osascript', '-e', script],
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            return result.stdout.strip()
+        except Exception:
+            return ""
+    
+    def get_volume(self) -> float:
+        """Get current volume level (0.0 to 1.0)."""
+        try:
+            output = self._run_osascript("output volume of (get volume settings)")
+            return int(output) / 100.0
+        except Exception:
+            return 1.0
+    
+    def set_volume(self, level: float) -> bool:
+        """Set volume level (0.0 to 1.0)."""
+        try:
+            level = max(0.0, min(1.0, level))
+            volume_int = int(level * 100)
+            self._run_osascript(f"set volume output volume {volume_int}")
+            return True
+        except Exception:
+            return False
+    
+    def is_muted(self) -> bool:
+        """Check if system audio is muted."""
+        try:
+            output = self._run_osascript("output muted of (get volume settings)")
+            return output.lower() == "true"
+        except Exception:
+            return False
+    
+    def mute(self) -> bool:
+        """Mute system audio."""
+        try:
+            self._run_osascript("set volume output muted true")
+            return True
+        except Exception:
+            return False
+    
+    def unmute(self) -> bool:
+        """Unmute system audio."""
+        try:
+            self._run_osascript("set volume output muted false")
+            return True
+        except Exception:
+            return False
+    
+    def toggle_mute(self) -> bool:
+        """Toggle mute state. Returns new mute state."""
+        if self.is_muted():
+            self.unmute()
+            return False
+        else:
+            self.mute()
+            return True
+    
+    def fade_out(self, duration: float = 0.3) -> bool:
+        """Fade out system audio over duration seconds."""
+        try:
+            self._saved_volume = self.get_volume()
+            if self._saved_volume <= 0:
+                return True
+            
+            steps = 10
+            step_duration = duration / steps
+            
+            def do_fade():
+                current = self._saved_volume
+                for i in range(steps):
+                    current = self._saved_volume * (1.0 - ((i + 1) / steps))
+                    self.set_volume(current)
+                    time.sleep(step_duration)
+                self.set_volume(0.0)
+            
+            self._fade_thread = threading.Thread(target=do_fade, daemon=True)
+            self._fade_thread.start()
+            return True
+        except Exception:
+            return self.mute()
+    
+    def fade_in(self, duration: float = 0.3) -> bool:
+        """Fade in system audio over duration seconds."""
+        try:
+            if self._saved_volume <= 0:
+                self._saved_volume = 0.5  # Default to 50% if nothing saved
+            
+            steps = 10
+            step_duration = duration / steps
+            
+            def do_fade():
+                for i in range(steps):
+                    current = self._saved_volume * ((i + 1) / steps)
+                    self.set_volume(current)
+                    time.sleep(step_duration)
+                self.set_volume(self._saved_volume)
+            
+            self._fade_thread = threading.Thread(target=do_fade, daemon=True)
+            self._fade_thread.start()
+            return True
+        except Exception:
+            return self.unmute()
+
+
 class DummyAudioController(AudioController):
-    """Dummy audio controller for non-Windows systems."""
+    """Dummy audio controller for unsupported systems."""
     
     def __init__(self):
         self._muted = False
@@ -354,6 +474,9 @@ def get_audio_controller() -> AudioController:
         except ImportError:
             print("pycaw not installed, using dummy audio controller")
             return DummyAudioController()
+    elif sys.platform == "darwin":
+        # macOS - use AppleScript via osascript
+        return MacAudioController()
     else:
-        # macOS/Linux - could add support later
+        # Linux - could add PulseAudio/PipeWire support later
         return DummyAudioController()
