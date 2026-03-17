@@ -15,6 +15,9 @@ google-genai>=1.0.0
 # Local Whisper (optional - for free local transcription)
 openai-whisper>=20231117
 
+# Local AI (Qwen3.5-0.8B)
+llama-cpp-python>=0.3.0
+
 # Utils
 python-dotenv>=1.0.0
 pydantic>=2.0.0

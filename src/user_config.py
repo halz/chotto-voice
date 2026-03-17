@@ -50,6 +50,9 @@ class UserConfig:
     hotkey_double_tap_threshold: float = 0.3
     hotkey_hold_threshold: float = 0.2
     
+    # AI provider: "qwen_local" (default), "gemini", "openai", "claude"
+    ai_provider: str = "qwen_local"
+    
     # UI settings
     auto_type: bool = True
     process_with_ai: bool = True

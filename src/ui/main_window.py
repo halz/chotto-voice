@@ -341,31 +341,23 @@ class FirstRunSetupDialog(QDialog):
         
         layout.addSpacing(16)
         
-        # Gemini (Free - Primary)
-        gemini_section = QLabel("Google Gemini（無料）")
-        gemini_section.setObjectName("section")
-        layout.addWidget(gemini_section)
+        # Local AI (Default - No API Key needed!)
+        local_section = QLabel("🤖 AI テキスト整形")
+        local_section.setObjectName("section")
+        layout.addWidget(local_section)
         
-        self.gemini_key_input = QLineEdit()
-        self.gemini_key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.gemini_key_input.setPlaceholderText("APIキーを入力")
-        layout.addWidget(self.gemini_key_input)
+        local_info = QLabel(
+            "Qwen3.5-0.8B（ローカル）をデフォルトで使用します。\n"
+            "APIキー不要・完全オフライン・無料！\n"
+            "初回起動時にモデルを自動ダウンロードします（~500MB）"
+        )
+        local_info.setObjectName("hint")
+        local_info.setWordWrap(True)
+        layout.addWidget(local_info)
         
-        gemini_hint_layout = QHBoxLayout()
-        gemini_hint = QLabel("AI整形に使用")
-        gemini_hint.setObjectName("hint")
-        gemini_hint_layout.addWidget(gemini_hint)
-        gemini_hint_layout.addStretch()
-        gemini_link = QPushButton("キーを取得 →")
-        gemini_link.setObjectName("link")
-        gemini_link.setCursor(Qt.CursorShape.PointingHandCursor)
-        gemini_link.clicked.connect(lambda: self._open_url("https://aistudio.google.com/app/apikey"))
-        gemini_hint_layout.addWidget(gemini_link)
-        layout.addLayout(gemini_hint_layout)
+        layout.addSpacing(16)
         
-        layout.addSpacing(8)
-        
-        # OpenAI (Optional)
+        # OpenAI (Optional - for Whisper API)
         openai_section = QLabel("OpenAI（オプション）")
         openai_section.setObjectName("section")
         layout.addWidget(openai_section)
@@ -376,7 +368,7 @@ class FirstRunSetupDialog(QDialog):
         layout.addWidget(self.openai_key_input)
         
         openai_hint_layout = QHBoxLayout()
-        openai_hint = QLabel("高精度な文字起こしに使用")
+        openai_hint = QLabel("高精度な音声認識（Whisper API）に使用")
         openai_hint.setObjectName("hint")
         openai_hint_layout.addWidget(openai_hint)
         openai_hint_layout.addStretch()
@@ -386,30 +378,6 @@ class FirstRunSetupDialog(QDialog):
         openai_link.clicked.connect(lambda: self._open_url("https://platform.openai.com/api-keys"))
         openai_hint_layout.addWidget(openai_link)
         layout.addLayout(openai_hint_layout)
-        
-        layout.addSpacing(8)
-        
-        # Anthropic (Optional)
-        anthropic_section = QLabel("Anthropic（オプション）")
-        anthropic_section.setObjectName("section")
-        layout.addWidget(anthropic_section)
-        
-        self.anthropic_key_input = QLineEdit()
-        self.anthropic_key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.anthropic_key_input.setPlaceholderText("sk-ant-...")
-        layout.addWidget(self.anthropic_key_input)
-        
-        anthropic_hint_layout = QHBoxLayout()
-        anthropic_hint = QLabel("Claude AIを使用する場合")
-        anthropic_hint.setObjectName("hint")
-        anthropic_hint_layout.addWidget(anthropic_hint)
-        anthropic_hint_layout.addStretch()
-        anthropic_link = QPushButton("キーを取得 →")
-        anthropic_link.setObjectName("link")
-        anthropic_link.setCursor(Qt.CursorShape.PointingHandCursor)
-        anthropic_link.clicked.connect(lambda: self._open_url("https://console.anthropic.com/settings/keys"))
-        anthropic_hint_layout.addWidget(anthropic_link)
-        layout.addLayout(anthropic_hint_layout)
         
         # Spacer
         layout.addStretch()
@@ -442,15 +410,12 @@ class FirstRunSetupDialog(QDialog):
     
     def _save_and_accept(self):
         """Save API keys and accept dialog."""
-        gemini_key = self.gemini_key_input.text().strip()
         openai_key = self.openai_key_input.text().strip()
-        anthropic_key = self.anthropic_key_input.text().strip()
         
-        # Save to config
+        # Save to config - Qwen local is default, no API key needed
         self.user_config.update(
-            gemini_api_key=gemini_key,
             openai_api_key=openai_key,
-            anthropic_api_key=anthropic_key,
+            ai_provider="qwen_local",  # Default to local AI
             # If OpenAI key provided, use API for transcription
             whisper_provider="api" if openai_key else "local"
         )
@@ -460,9 +425,7 @@ class FirstRunSetupDialog(QDialog):
     def get_keys(self) -> dict:
         """Return the entered API keys."""
         return {
-            "gemini": self.gemini_key_input.text().strip(),
             "openai": self.openai_key_input.text().strip(),
-            "anthropic": self.anthropic_key_input.text().strip()
         }
 
 
@@ -1006,49 +969,59 @@ class MainWindow(QMainWindow):
         self.page_stack.addWidget(page)
     
     def _create_whisper_page(self):
-        """Create the Whisper/speech recognition page."""
+        """Create the speech recognition & AI page."""
         page = QWidget()
-        layout = QVBoxLayout(page)
+        
+        # Use scroll area for longer content
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        
+        inner = QWidget()
+        layout = QVBoxLayout(inner)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
         
         # Page title
-        title = QLabel("音声認識")
+        title = QLabel("音声認識 & AI")
         title.setObjectName("pageTitle")
         layout.addWidget(title)
         
-        hint = QLabel("Whisperによる音声認識の設定")
+        hint = QLabel("音声認識とAIテキスト整形の設定")
         hint.setObjectName("hint")
         layout.addWidget(hint)
         
         layout.addSpacing(16)
         
+        # === STT Section ===
+        stt_title = QLabel("音声認識（STT）")
+        stt_title.setObjectName("sectionTitle")
+        layout.addWidget(stt_title)
+        
         # Provider
         provider_label = QLabel("認識エンジン")
-        provider_label.setObjectName("sectionTitle")
+        provider_label.setObjectName("settingLabel")
         layout.addWidget(provider_label)
         
         self.whisper_provider_combo = QComboBox()
-        self.whisper_provider_combo.addItem("ローカル（無料・オフライン）", "local")
-        self.whisper_provider_combo.addItem("OpenAI API（高速・高精度）", "api")
-        self.whisper_provider_combo.setFixedWidth(250)
+        self.whisper_provider_combo.addItem("ローカル Whisper（無料・オフライン）", "local")
+        self.whisper_provider_combo.addItem("OpenAI Whisper API（高速・高精度）", "api")
+        self.whisper_provider_combo.setFixedWidth(280)
         current_provider = self.user_config.whisper_provider
         self.whisper_provider_combo.setCurrentIndex(0 if current_provider == "local" else 1)
         self.whisper_provider_combo.currentIndexChanged.connect(self._on_whisper_provider_changed)
         layout.addWidget(self.whisper_provider_combo)
         
-        layout.addSpacing(16)
-        
         # Model
         model_label = QLabel("モデルサイズ")
-        model_label.setObjectName("sectionTitle")
+        model_label.setObjectName("settingLabel")
         layout.addWidget(model_label)
         
         self.whisper_model_combo = QComboBox()
         self.whisper_model_combo.addItem("tiny（最速・39MB）", "tiny")
         self.whisper_model_combo.addItem("base（バランス・74MB）", "base")
         self.whisper_model_combo.addItem("small（高精度・244MB）", "small")
-        self.whisper_model_combo.setFixedWidth(250)
+        self.whisper_model_combo.setFixedWidth(280)
         model_map = {"tiny": 0, "base": 1, "small": 2}
         self.whisper_model_combo.setCurrentIndex(model_map.get(self.user_config.whisper_local_model, 2))
         self.whisper_model_combo.setEnabled(current_provider == "local")
@@ -1059,7 +1032,58 @@ class MainWindow(QMainWindow):
         model_hint.setObjectName("hint")
         layout.addWidget(model_hint)
         
+        layout.addSpacing(16)
+        
+        # === AI Text Formatting Section ===
+        ai_title = QLabel("テキスト整形（AI）")
+        ai_title.setObjectName("sectionTitle")
+        layout.addWidget(ai_title)
+        
+        ai_label = QLabel("整形エンジン")
+        ai_label.setObjectName("settingLabel")
+        layout.addWidget(ai_label)
+        
+        self.ai_provider_combo = QComboBox()
+        self.ai_provider_combo.addItem("Qwen3.5-0.8B（ローカル・無料）", "qwen_local")
+        self.ai_provider_combo.addItem("Google Gemini（API）", "gemini")
+        self.ai_provider_combo.addItem("OpenAI GPT（API）", "openai")
+        self.ai_provider_combo.addItem("Anthropic Claude（API）", "claude")
+        self.ai_provider_combo.setFixedWidth(280)
+        
+        # Set current selection
+        ai_provider = getattr(self.user_config, 'ai_provider', 'qwen_local')
+        ai_provider_map = {"qwen_local": 0, "gemini": 1, "openai": 2, "claude": 3}
+        self.ai_provider_combo.setCurrentIndex(ai_provider_map.get(ai_provider, 0))
+        self.ai_provider_combo.currentIndexChanged.connect(self._on_ai_provider_changed)
+        layout.addWidget(self.ai_provider_combo)
+        
+        # Qwen status label
+        self.qwen_status_label = QLabel("")
+        self.qwen_status_label.setObjectName("hint")
+        self._update_qwen_status()
+        layout.addWidget(self.qwen_status_label)
+        
+        # Download button (only shown when model not downloaded)
+        self.qwen_download_btn = QPushButton("モデルをダウンロード（~500MB）")
+        self.qwen_download_btn.setObjectName("primary")
+        self.qwen_download_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.qwen_download_btn.clicked.connect(self._download_qwen_model)
+        self.qwen_download_btn.setFixedWidth(280)
+        layout.addWidget(self.qwen_download_btn)
+        self._update_qwen_download_visibility()
+        
+        ai_hint = QLabel("ローカルAIはネット接続不要・完全オフライン")
+        ai_hint.setObjectName("hint")
+        layout.addWidget(ai_hint)
+        
         layout.addStretch()
+        
+        scroll.setWidget(inner)
+        
+        page_layout = QVBoxLayout(page)
+        page_layout.setContentsMargins(0, 0, 0, 0)
+        page_layout.addWidget(scroll)
+        
         self.page_stack.addWidget(page)
     
     def _create_api_page(self):
@@ -1532,6 +1556,155 @@ class MainWindow(QMainWindow):
         position = self.overlay_position_combo.itemData(index)
         self.overlay.set_position(position)
         self.user_config.update(overlay_position=position)
+    
+    def _on_ai_provider_changed(self, index: int):
+        """Handle AI provider change."""
+        provider = self.ai_provider_combo.itemData(index)
+        self.user_config.update(ai_provider=provider)
+        self._update_qwen_download_visibility()
+        self._update_qwen_status()
+        
+        # Reinitialize AI client
+        self._reinit_ai_client()
+    
+    def _update_qwen_status(self):
+        """Update Qwen model status label."""
+        from ..ai_client import QwenLocalClient
+        ai_provider = getattr(self.user_config, 'ai_provider', 'qwen_local')
+        
+        if ai_provider == "qwen_local":
+            if QwenLocalClient.is_model_downloaded():
+                self.qwen_status_label.setText("✅ Qwen3.5-0.8B モデル準備完了")
+                self.qwen_status_label.setStyleSheet("color: green; font-size: 12px;")
+            else:
+                self.qwen_status_label.setText("⚠️ モデル未ダウンロード")
+                self.qwen_status_label.setStyleSheet("color: orange; font-size: 12px;")
+        else:
+            self.qwen_status_label.setText("")
+    
+    def _update_qwen_download_visibility(self):
+        """Show/hide download button based on model status."""
+        from ..ai_client import QwenLocalClient
+        ai_provider = getattr(self.user_config, 'ai_provider', 'qwen_local')
+        
+        show = (ai_provider == "qwen_local" and not QwenLocalClient.is_model_downloaded())
+        self.qwen_download_btn.setVisible(show)
+    
+    def _download_qwen_model(self):
+        """Download Qwen model in background."""
+        self.qwen_download_btn.setEnabled(False)
+        self.qwen_download_btn.setText("ダウンロード中...")
+        self.qwen_status_label.setText("⏳ ダウンロード中... しばらくお待ちください")
+        self.qwen_status_label.setStyleSheet("color: orange; font-size: 12px;")
+        
+        # Run download in thread
+        from PyQt6.QtCore import QThread, pyqtSignal
+        
+        class DownloadWorker(QThread):
+            finished = pyqtSignal(bool, str)
+            progress = pyqtSignal(int, int)
+            
+            def run(self):
+                try:
+                    from ..ai_client import QwenLocalClient
+                    QwenLocalClient.download_model(
+                        progress_callback=lambda d, t: self.progress.emit(d, t)
+                    )
+                    self.finished.emit(True, "")
+                except Exception as e:
+                    self.finished.emit(False, str(e))
+        
+        self._download_worker = DownloadWorker()
+        self._download_worker.progress.connect(self._on_download_progress)
+        self._download_worker.finished.connect(self._on_download_finished)
+        self._download_worker.start()
+    
+    def _on_download_progress(self, downloaded: int, total: int):
+        """Update download progress."""
+        if total > 0:
+            mb_done = downloaded / (1024 * 1024)
+            mb_total = total / (1024 * 1024)
+            pct = int(downloaded * 100 / total)
+            self.qwen_status_label.setText(
+                f"⏳ ダウンロード中... {mb_done:.0f}/{mb_total:.0f} MB ({pct}%)"
+            )
+    
+    def _on_download_finished(self, success: bool, error: str):
+        """Handle download completion."""
+        if success:
+            self.qwen_status_label.setText("✅ ダウンロード完了！")
+            self.qwen_status_label.setStyleSheet("color: green; font-size: 12px;")
+            self.qwen_download_btn.setVisible(False)
+            
+            # Auto-initialize AI client
+            self._reinit_ai_client()
+            
+            self.tray_icon.showMessage(
+                "Chotto Voice",
+                "Qwen3.5-0.8B モデルのダウンロードが完了しました！",
+                QSystemTrayIcon.MessageIcon.Information,
+                3000
+            )
+        else:
+            self.qwen_status_label.setText(f"❌ ダウンロードエラー: {error}")
+            self.qwen_status_label.setStyleSheet("color: red; font-size: 12px;")
+            self.qwen_download_btn.setEnabled(True)
+            self.qwen_download_btn.setText("モデルをダウンロード（~500MB）")
+    
+    def _reinit_ai_client(self):
+        """Reinitialize AI client based on current settings."""
+        ai_provider = getattr(self.user_config, 'ai_provider', 'qwen_local')
+        
+        if ai_provider == "qwen_local":
+            try:
+                from ..ai_client import QwenLocalClient
+                if QwenLocalClient.is_model_downloaded():
+                    from ..ai_client import create_ai_client
+                    self.ai_client = create_ai_client(provider="qwen_local")
+                    self.ai_process_check.setEnabled(True)
+                    self.status_label.setText("✅ Qwen3.5 (ローカル) 準備完了")
+                    self.status_label.setStyleSheet("color: green;")
+                    print("AI client: Qwen3.5-0.8B (local)")
+                else:
+                    self.status_label.setText("⚠️ Qwenモデル未ダウンロード")
+                    self.status_label.setStyleSheet("color: orange;")
+            except Exception as e:
+                print(f"Qwen client error: {e}")
+                self.status_label.setText(f"❌ Qwenエラー: {e}")
+                self.status_label.setStyleSheet("color: red;")
+        elif ai_provider == "gemini" and self.user_config.gemini_api_key:
+            try:
+                from ..ai_client import create_ai_client
+                self.ai_client = create_ai_client(
+                    provider="gemini",
+                    api_key=self.user_config.gemini_api_key
+                )
+                self.ai_process_check.setEnabled(True)
+                print("AI client: Google Gemini")
+            except Exception as e:
+                print(f"Gemini client error: {e}")
+        elif ai_provider == "openai" and self.user_config.openai_api_key:
+            try:
+                from ..ai_client import create_ai_client
+                self.ai_client = create_ai_client(
+                    provider="openai",
+                    api_key=self.user_config.openai_api_key
+                )
+                self.ai_process_check.setEnabled(True)
+                print("AI client: OpenAI GPT")
+            except Exception as e:
+                print(f"OpenAI client error: {e}")
+        elif ai_provider == "claude" and self.user_config.anthropic_api_key:
+            try:
+                from ..ai_client import create_ai_client
+                self.ai_client = create_ai_client(
+                    provider="claude",
+                    api_key=self.user_config.anthropic_api_key
+                )
+                self.ai_process_check.setEnabled(True)
+                print("AI client: Claude")
+            except Exception as e:
+                print(f"Claude client error: {e}")
     
     def _on_whisper_provider_changed(self, index: int):
         """Handle Whisper provider change."""

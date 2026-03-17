@@ -48,13 +48,37 @@ def create_transcriber_from_config(user_config, settings):
 
 
 def create_ai_client_from_config(user_config, settings):
-    """Create AI client based on user config."""
+    """Create AI client based on user config.
+    
+    Priority: Qwen Local (default) > Gemini > Claude > OpenAI
+    """
+    ai_provider = getattr(user_config, 'ai_provider', 'qwen_local')
+    
+    # If explicitly set to qwen_local or default
+    if ai_provider == "qwen_local":
+        try:
+            from src.ai_client import QwenLocalClient
+            
+            # Check if model is downloaded
+            if not QwenLocalClient.is_model_downloaded():
+                print("Qwen3.5-0.8B model not found. Downloading...")
+                print("(This is a one-time download, ~500MB)")
+                QwenLocalClient.download_model()
+            
+            client = create_ai_client(provider="qwen_local")
+            print("Using Qwen3.5-0.8B (local) for AI processing")
+            return client
+        except Exception as e:
+            print(f"Warning: Qwen local error: {e}")
+            print("Falling back to API-based AI...")
+    
+    # Fallback to API providers
     gemini_key = user_config.gemini_api_key
     anthropic_key = user_config.anthropic_api_key or settings.anthropic_api_key
     openai_key = user_config.openai_api_key or settings.openai_api_key
     
     try:
-        if gemini_key:
+        if ai_provider == "gemini" and gemini_key:
             client = create_ai_client(
                 provider="gemini",
                 api_key=gemini_key,
@@ -62,7 +86,7 @@ def create_ai_client_from_config(user_config, settings):
             )
             print("Using Google Gemini for AI processing")
             return client
-        elif anthropic_key:
+        elif ai_provider == "claude" and anthropic_key:
             client = create_ai_client(
                 provider="claude",
                 api_key=anthropic_key,
@@ -70,7 +94,7 @@ def create_ai_client_from_config(user_config, settings):
             )
             print("Using Claude for AI processing")
             return client
-        elif openai_key:
+        elif ai_provider == "openai" and openai_key:
             client = create_ai_client(
                 provider="openai",
                 api_key=openai_key,
