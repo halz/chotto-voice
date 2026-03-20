@@ -1,7 +1,6 @@
 """Speech-to-text transcription module for Chotto Voice."""
 from abc import ABC, abstractmethod
 from typing import Optional
-import openai
 
 
 class Transcriber(ABC):
@@ -17,6 +16,7 @@ class OpenAIWhisperTranscriber(Transcriber):
     """Transcriber using OpenAI Whisper API."""
     
     def __init__(self, api_key: str, model: str = "whisper-1"):
+        import openai
         self.client = openai.OpenAI(api_key=api_key)
         self.model = model
     
@@ -46,11 +46,35 @@ class LocalWhisperTranscriber(Transcriber):
         self.model_name = model_name
         self._model = None
     
+    def _get_model_dir(self) -> Optional[str]:
+        """Get bundled whisper model directory if available."""
+        import sys
+        import os
+        
+        # Check for bundled models (portable build)
+        if getattr(sys, 'frozen', False):
+            exe_dir = os.path.dirname(sys.executable)
+            bundled = os.path.join(exe_dir, "models", "whisper")
+            if os.path.exists(bundled):
+                return bundled
+        else:
+            script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            local = os.path.join(script_dir, "models", "whisper")
+            if os.path.exists(local):
+                return local
+        
+        return None
+    
     def _load_model(self):
         """Lazy load the Whisper model."""
         if self._model is None:
             import whisper
-            self._model = whisper.load_model(self.model_name)
+            model_dir = self._get_model_dir()
+            if model_dir:
+                print(f"[Whisper] Loading from bundled: {model_dir}", flush=True)
+                self._model = whisper.load_model(self.model_name, download_root=model_dir)
+            else:
+                self._model = whisper.load_model(self.model_name)
     
     def transcribe(self, audio_data: bytes) -> str:
         """Transcribe audio using local Whisper model."""

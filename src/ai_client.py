@@ -61,11 +61,39 @@ class QwenLocalClient(AIClient):
     
     @staticmethod
     def get_default_model_path() -> str:
-        """Get default model path based on platform."""
+        """Get default model path based on platform.
+        
+        Priority:
+        1. Bundled with EXE (portable mode): <exe_dir>/models/
+        2. User config dir: %APPDATA%/ChottoVoice/models/
+        """
+        model_name = "Qwen3.5-0.8B-Q4_K_M.gguf"
+        
+        # Check for bundled model (PyInstaller portable build)
+        if getattr(sys, 'frozen', False):
+            # Running as compiled EXE
+            exe_dir = os.path.dirname(sys.executable)
+            bundled = os.path.join(exe_dir, "models", model_name)
+            if os.path.exists(bundled):
+                return bundled
+            # Also check PyInstaller _MEIPASS (onefile mode)
+            meipass = getattr(sys, '_MEIPASS', None)
+            if meipass:
+                bundled = os.path.join(meipass, "models", model_name)
+                if os.path.exists(bundled):
+                    return bundled
+        else:
+            # Running as script - check local models/ dir
+            script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            local = os.path.join(script_dir, "models", model_name)
+            if os.path.exists(local):
+                return local
+        
+        # Fallback to user config dir
         from .user_config import get_config_dir
         model_dir = get_config_dir() / "models"
         model_dir.mkdir(parents=True, exist_ok=True)
-        return str(model_dir / "Qwen3.5-0.8B-Q4_K_M.gguf")
+        return str(model_dir / model_name)
     
     @staticmethod
     def is_model_downloaded(model_path: Optional[str] = None) -> bool:
