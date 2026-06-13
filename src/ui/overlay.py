@@ -5,6 +5,8 @@ from PyQt6.QtGui import QPainter, QColor, QBrush, QPen, QFont, QPainterPath, QAc
 import time
 import random
 
+from ..caret import get_caret_rect
+
 
 # Position options
 OVERLAY_POSITIONS = {
@@ -42,10 +44,15 @@ class OverlayIndicator(QWidget):
     TIMER_COLOR = QColor(160, 160, 160)  # Gray
     PROCESSING_COLOR = QColor(255, 152, 0)  # Orange
     
+    GAP = 8  # Distance from the caret when floating.
+
     def __init__(self, position: str = "bottom-right"):
         super().__init__()
         self._state = "idle"  # idle, recording, processing
         self._position = position
+        # When floating near the focused text box this holds the desired
+        # top-left anchor in screen coords; None means use the fixed corner.
+        self._caret_anchor = None
         self._recording_start_time = 0
         self._audio_levels = [0.1] * 30  # Waveform data (fewer bars for smaller size)
         self._current_width = float(self.IDLE_WIDTH)
@@ -126,10 +133,12 @@ class OverlayIndicator(QWidget):
         self._shake_timer.setInterval(30)
         self._shake_frame = 0
         
-        # Always-on-top enforcement timer (every 500ms)
+        # Always-on-top enforcement timer. Raising the window every 500ms
+        # caused visible flicker and stole focus; only nudge it while active
+        # and at a gentler cadence.
         self._topmost_timer = QTimer(self)
         self._topmost_timer.timeout.connect(self._enforce_topmost)
-        self._topmost_timer.setInterval(500)
+        self._topmost_timer.setInterval(1200)
         self._topmost_timer.start()
     
     def _setup_animations(self):
@@ -206,17 +215,42 @@ class OverlayIndicator(QWidget):
             self.setFixedSize(int(self._current_width), int(self._current_height))
             self._position_window()
     
+    def _refresh_caret_anchor(self):
+        """Try to anchor the overlay near the focused text box (best-effort).
+
+        Falls back to the configured screen corner when the caret position
+        can't be determined (unsupported app, missing permissions, Linux).
+        """
+        rect = get_caret_rect()
+        if not rect:
+            self._caret_anchor = None
+            return
+
+        cx, cy, cw, ch = rect
+        # Place the indicator just below the caret/field, nudged left so it
+        # doesn't cover the text being entered.
+        self._caret_anchor = (cx, cy + ch + self.GAP)
+
     def _position_window(self):
-        """Position window based on configured position."""
+        """Position the window near the caret if anchored, else at the corner."""
         screen = QApplication.primaryScreen()
         if not screen:
             return
-        
+
         geometry = screen.availableGeometry()
         w = int(self._current_width)
         h = int(self._current_height)
         m = self.MARGIN
-        
+
+        # Caret-following mode: clamp the anchor onto the visible screen.
+        if self._caret_anchor is not None:
+            virtual = screen.virtualGeometry()
+            ax, ay = self._caret_anchor
+            x = min(max(ax, virtual.left() + m), virtual.right() - w - m)
+            y = min(max(ay, virtual.top() + m), virtual.bottom() - h - m)
+            self.move(int(x), int(y))
+            return
+
         # Calculate position based on setting
         if self._position == "top-left":
             x = geometry.left() + m
@@ -287,8 +321,12 @@ class OverlayIndicator(QWidget):
         self.update()
     
     def _enforce_topmost(self):
-        """Enforce always-on-top by raising the window periodically."""
-        if self.isVisible():
+        """Keep the indicator above other windows while it's active.
+
+        Only raises during recording/processing — raising during idle is
+        unnecessary and produced flicker.
+        """
+        if self.isVisible() and self._state != "idle":
             self.raise_()
     
     def enterEvent(self, event):
@@ -321,6 +359,13 @@ class OverlayIndicator(QWidget):
             return
         
         self._state = state
+
+        # Float near the focused text box while active; pin to the corner idle.
+        if state == "idle":
+            self._caret_anchor = None
+        else:
+            self._refresh_caret_anchor()
+
         target_w = self.IDLE_WIDTH if state == "idle" else self.RECORDING_WIDTH
         target_h = self.IDLE_HEIGHT if state == "idle" else self.RECORDING_HEIGHT
         # print(f"[Overlay] Target size: {target_w}x{target_h}", flush=True)

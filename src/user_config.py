@@ -9,6 +9,10 @@ from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass, asdict, field
 
+# Canonical Whisper provider identifiers used throughout the app.
+WHISPER_LOCAL = "local"
+WHISPER_OPENAI_API = "openai_api"
+
 
 def get_config_dir() -> Path:
     """Get the configuration directory for the current platform."""
@@ -36,13 +40,21 @@ def get_config_path() -> Path:
 class UserConfig:
     """User-configurable settings that persist across sessions."""
     
-    # API Keys (stored in user config, not .env)
+    # API Keys for the built-in cloud providers (stored here, not in .env).
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     gemini_api_key: str = ""
-    
-    # Whisper settings
-    whisper_provider: str = "local"  # "local" or "api" - default to free local
+
+    # Active AI provider (key into ai_client.PROVIDERS).
+    ai_provider: str = "gemini"
+
+    # Per-provider overrides: {provider_key: {"api_key", "base_url", "model"}}.
+    # Used for model overrides and for OpenAI-compatible servers (Ollama,
+    # LM Studio, generic) which need a base URL and optional API key.
+    ai_settings: dict = field(default_factory=dict)
+
+    # Whisper settings. whisper_provider is one of WHISPER_LOCAL / WHISPER_OPENAI_API.
+    whisper_provider: str = WHISPER_LOCAL  # default to free local transcription
     whisper_local_model: str = "small"  # tiny, base, small, medium, large
     
     # Hotkey settings
@@ -69,16 +81,63 @@ class UserConfig:
     def load(cls) -> "UserConfig":
         """Load config from file, or return defaults."""
         config_path = get_config_path()
-        
+
         if config_path.exists():
             try:
                 with open(config_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
+                config = cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
+                config._migrate()
+                return config
             except (json.JSONDecodeError, TypeError) as e:
                 print(f"Config load error: {e}, using defaults")
-        
+
         return cls()
+
+    def _migrate(self):
+        """Normalise values written by older versions of the app."""
+        # Older builds stored the Whisper provider as "api"; standardise it.
+        if self.whisper_provider == "api":
+            self.whisper_provider = WHISPER_OPENAI_API
+        elif self.whisper_provider not in (WHISPER_LOCAL, WHISPER_OPENAI_API):
+            self.whisper_provider = WHISPER_LOCAL
+
+    def get_provider_settings(self, provider: str) -> dict:
+        """Return the stored {api_key, base_url, model} for a provider."""
+        return dict(self.ai_settings.get(provider, {}))
+
+    def set_provider_settings(self, provider: str, **values):
+        """Persist per-provider settings (only non-None values)."""
+        current = dict(self.ai_settings.get(provider, {}))
+        for key, value in values.items():
+            if value is not None:
+                current[key] = value
+        self.ai_settings[provider] = current
+        self.save()
+
+    def credentials_for(self, provider: str) -> dict:
+        """Return {api_key, base_url, model} for any provider.
+
+        Bridges the three legacy top-level API-key fields (gemini/anthropic/
+        openai) with the generic per-provider ``ai_settings`` store.
+        """
+        settings = self.ai_settings.get(provider, {})
+        legacy_key = {
+            "gemini": self.gemini_api_key,
+            "claude": self.anthropic_api_key,
+            "openai": self.openai_api_key,
+        }.get(provider, "")
+        return {
+            "api_key": settings.get("api_key") or legacy_key,
+            "base_url": settings.get("base_url", ""),
+            "model": settings.get("model", ""),
+        }
+
+    def resolve_ai(self) -> dict:
+        """Resolve the active provider into {provider, api_key, base_url, model}."""
+        creds = self.credentials_for(self.ai_provider)
+        creds["provider"] = self.ai_provider
+        return creds
     
     def save(self):
         """Save config to file."""

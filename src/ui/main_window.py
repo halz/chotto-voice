@@ -278,21 +278,21 @@ class FirstRunSetupDialog(QDialog):
             font-size: 13px;
         }
         QLineEdit:focus {
-            border-color: #4A90D9;
+            border-color: #007aff;
         }
         QPushButton#link {
             background: transparent;
-            color: #4A90D9;
+            color: #007aff;
             border: none;
             font-size: 13px;
             padding: 0;
         }
         QPushButton#link:hover {
-            color: #357ABD;
+            color: #0a6cff;
             text-decoration: underline;
         }
         QPushButton#primary {
-            background-color: #2563eb;
+            background-color: #007aff;
             color: #ffffff;
             border: none;
             border-radius: 8px;
@@ -302,7 +302,7 @@ class FirstRunSetupDialog(QDialog):
             min-width: 100px;
         }
         QPushButton#primary:hover {
-            background-color: #1d4ed8;
+            background-color: #0a6cff;
         }
         QPushButton#secondary {
             background-color: #f3f4f6;
@@ -446,15 +446,27 @@ class FirstRunSetupDialog(QDialog):
         openai_key = self.openai_key_input.text().strip()
         anthropic_key = self.anthropic_key_input.text().strip()
         
+        from ..user_config import WHISPER_LOCAL, WHISPER_OPENAI_API
+        # Pick a sensible default active provider based on what was entered.
+        if gemini_key:
+            ai_provider = "gemini"
+        elif anthropic_key:
+            ai_provider = "claude"
+        elif openai_key:
+            ai_provider = "openai"
+        else:
+            ai_provider = self.user_config.ai_provider
+
         # Save to config
         self.user_config.update(
             gemini_api_key=gemini_key,
             openai_api_key=openai_key,
             anthropic_api_key=anthropic_key,
-            # If OpenAI key provided, use API for transcription
-            whisper_provider="api" if openai_key else "local"
+            ai_provider=ai_provider,
+            # If an OpenAI key was provided, prefer the higher-accuracy API.
+            whisper_provider=WHISPER_OPENAI_API if openai_key else WHISPER_LOCAL,
         )
-        
+
         self.accept()
     
     def get_keys(self) -> dict:
@@ -475,18 +487,23 @@ class TranscriptionWorker(QThread):
     error = pyqtSignal(str)
     
     def __init__(
-        self, 
-        transcriber: Transcriber, 
+        self,
+        transcriber: Transcriber,
         ai_client: Optional[AIClient],
         audio_data: bytes,
-        process_with_ai: bool = True
+        process_with_ai: bool = True,
+        auto_type: bool = False,
     ):
         super().__init__()
         self.transcriber = transcriber
         self.ai_client = ai_client
         self.audio_data = audio_data
         self.process_with_ai = process_with_ai
-    
+        self.auto_type = auto_type
+        # True once the formatted text has already been typed into the focused
+        # field incrementally, so the UI shouldn't type it again at the end.
+        self.typed_inline = False
+
     def run(self):
         try:
             # Check for silence first
@@ -495,33 +512,48 @@ class TranscriptionWorker(QThread):
                 print("[Worker] Audio too quiet (silence detected), skipping", flush=True)
                 self.finished.emit("")
                 return
-            
+
             # Step 1: Transcribe
             print(f"[Worker] Transcribing audio ({len(self.audio_data)} bytes)...", flush=True)
             text = self.transcriber.transcribe(self.audio_data)
             print(f"[Worker] Transcription: '{text[:50] if text else '(empty)'}...'", flush=True)
             self.transcription_done.emit(text)
-            
+
             if not text:
                 print("[Worker] No text, skipping AI", flush=True)
                 self.finished.emit("")
                 return
-            
+
             # Step 2: AI processing (if enabled and available)
-            print(f"[Worker] AI: process_with_ai={self.process_with_ai}, client={self.ai_client is not None}", flush=True)
             if self.process_with_ai and self.ai_client:
-                print(f"[Worker] Starting AI processing with {type(self.ai_client).__name__}...", flush=True)
+                print(f"[Worker] Streaming AI with {type(self.ai_client).__name__}...", flush=True)
+
+                # Stream the formatted text straight into the focused field as
+                # it arrives, instead of waiting for the whole response.
+                typer = None
+                if self.auto_type:
+                    from ..text_input import StreamingTyper
+                    typer = StreamingTyper()
+                    typer.start()
+                    self.typed_inline = True
+
                 result_text = ""
-                for chunk in self.ai_client.process_stream(text):
-                    print(f"[Worker] AI chunk: '{chunk}'", flush=True)
-                    self.ai_chunk.emit(chunk)
-                    result_text += chunk
+                try:
+                    for chunk in self.ai_client.process_stream(text):
+                        self.ai_chunk.emit(chunk)
+                        result_text += chunk
+                        if typer is not None:
+                            typer.feed(chunk)
+                finally:
+                    if typer is not None:
+                        typer.finish()
+
                 print(f"[Worker] AI result: '{result_text[:50] if result_text else '(empty)'}...'", flush=True)
                 self.finished.emit(result_text)
             else:
                 print("[Worker] Skipping AI, using raw text", flush=True)
                 self.finished.emit(text)
-                
+
         except Exception as e:
             print(f"[Worker] Error: {e}", flush=True)
             self.error.emit(str(e))
@@ -531,15 +563,18 @@ class MainWindow(QMainWindow):
     """Main application window."""
     
     STYLE = """
+        * {
+            font-family: "-apple-system", "SF Pro Text", "Helvetica Neue", "Segoe UI", "Yu Gothic UI", sans-serif;
+        }
         QMainWindow {
-            background-color: #ffffff;
+            background-color: #f2f2f4;
         }
         QWidget#sidebar {
-            background-color: #f8f9fa;
-            border-right: 1px solid #e9ecef;
+            background-color: #e8e8ed;
+            border-right: 1px solid #d6d6db;
         }
         QWidget#content {
-            background-color: #ffffff;
+            background-color: #f7f7f9;
         }
         QListWidget {
             background-color: transparent;
@@ -548,17 +583,17 @@ class MainWindow(QMainWindow):
             outline: none;
         }
         QListWidget::item {
-            padding: 12px 16px;
+            padding: 8px 12px;
             border-radius: 6px;
             margin: 2px 8px;
-            color: #495057;
+            color: #1d1d1f;
         }
         QListWidget::item:selected {
-            background-color: #e7f1ff;
-            color: #1971c2;
+            background-color: #007aff;
+            color: #ffffff;
         }
         QListWidget::item:hover:!selected {
-            background-color: #f1f3f4;
+            background-color: #dcdce2;
         }
         QLabel#appTitle {
             font-size: 16px;
@@ -597,7 +632,7 @@ class MainWindow(QMainWindow):
             color: #212529;
         }
         QLineEdit:focus {
-            border-color: #74c0fc;
+            border-color: #007aff;
             outline: none;
         }
         QComboBox {
@@ -610,7 +645,7 @@ class MainWindow(QMainWindow):
             color: #212529;
         }
         QComboBox:focus {
-            border-color: #74c0fc;
+            border-color: #007aff;
         }
         QComboBox::drop-down {
             border: none;
@@ -648,7 +683,7 @@ class MainWindow(QMainWindow):
         }
         QPushButton#posBtn:checked {
             background: transparent;
-            color: #228be6;
+            color: #007aff;
             font-size: 12px;
         }
         QLineEdit#hotkeyInput {
@@ -661,13 +696,13 @@ class MainWindow(QMainWindow):
             color: #212529;
         }
         QLineEdit#hotkeyInput:focus {
-            border-color: #228be6;
+            border-color: #007aff;
             background: #f8f9fa;
         }
         QComboBox QAbstractItemView {
             background-color: white;
             border: 1px solid #dee2e6;
-            selection-background-color: #e7f1ff;
+            selection-background-color: #dbeafe;
             selection-color: #212529;
             color: #212529;
             outline: none;
@@ -680,7 +715,7 @@ class MainWindow(QMainWindow):
             background-color: white;
         }
         QComboBox QAbstractItemView::item:selected {
-            background-color: #e7f1ff;
+            background-color: #dbeafe;
             color: #212529;
         }
         QTextEdit {
@@ -704,10 +739,10 @@ class MainWindow(QMainWindow):
             background: #ced4da;
         }
         QCheckBox::indicator:checked {
-            background: #228be6;
+            background: #007aff;
         }
         QPushButton#primary {
-            background-color: #228be6;
+            background-color: #007aff;
             color: white;
             border: none;
             border-radius: 6px;
@@ -716,7 +751,7 @@ class MainWindow(QMainWindow):
             font-weight: 500;
         }
         QPushButton#primary:hover {
-            background-color: #1c7ed6;
+            background-color: #0a6cff;
         }
         QPushButton#secondary {
             background-color: #f8f9fa;
@@ -736,7 +771,7 @@ class MainWindow(QMainWindow):
             max-height: 4px;
         }
         QProgressBar::chunk {
-            background: #228be6;
+            background: #007aff;
             border-radius: 2px;
         }
     """
@@ -838,7 +873,7 @@ class MainWindow(QMainWindow):
         self.nav_list = QListWidget()
         self.nav_list.addItem("設定")
         self.nav_list.addItem("音声認識")
-        self.nav_list.addItem("APIキー")
+        self.nav_list.addItem("AI")
         self.nav_list.setCurrentRow(0)
         self.nav_list.currentRowChanged.connect(self._on_nav_changed)
         sidebar_layout.addWidget(self.nav_list)
@@ -1028,12 +1063,13 @@ class MainWindow(QMainWindow):
         provider_label.setObjectName("sectionTitle")
         layout.addWidget(provider_label)
         
+        from ..user_config import WHISPER_LOCAL, WHISPER_OPENAI_API
         self.whisper_provider_combo = QComboBox()
-        self.whisper_provider_combo.addItem("ローカル（無料・オフライン）", "local")
-        self.whisper_provider_combo.addItem("OpenAI API（高速・高精度）", "api")
+        self.whisper_provider_combo.addItem("ローカル（無料・オフライン）", WHISPER_LOCAL)
+        self.whisper_provider_combo.addItem("OpenAI API（高速・高精度）", WHISPER_OPENAI_API)
         self.whisper_provider_combo.setFixedWidth(250)
         current_provider = self.user_config.whisper_provider
-        self.whisper_provider_combo.setCurrentIndex(0 if current_provider == "local" else 1)
+        self.whisper_provider_combo.setCurrentIndex(0 if current_provider == WHISPER_LOCAL else 1)
         self.whisper_provider_combo.currentIndexChanged.connect(self._on_whisper_provider_changed)
         layout.addWidget(self.whisper_provider_combo)
         
@@ -1063,73 +1099,132 @@ class MainWindow(QMainWindow):
         self.page_stack.addWidget(page)
     
     def _create_api_page(self):
-        """Create the API keys page."""
+        """Create the AI provider page (provider picker + dynamic fields)."""
+        from ..ai_client import PROVIDERS
+
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
-        
-        # Page title
-        title = QLabel("APIキー")
+        layout.setSpacing(10)
+
+        title = QLabel("AI")
         title.setObjectName("pageTitle")
         layout.addWidget(title)
-        
-        hint = QLabel("各サービスのAPIキーを設定")
+
+        hint = QLabel("文章整形に使うAIを選択")
         hint.setObjectName("hint")
         layout.addWidget(hint)
-        
-        layout.addSpacing(16)
-        
-        # Gemini
-        gemini_label = QLabel("Google Gemini（無料）")
-        gemini_label.setObjectName("sectionTitle")
-        layout.addWidget(gemini_label)
-        
-        self.gemini_key_input = QLineEdit()
-        self.gemini_key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.gemini_key_input.setPlaceholderText("AIza...")
-        if self.user_config.gemini_api_key:
-            self.gemini_key_input.setText(self.user_config.gemini_api_key)
-        layout.addWidget(self.gemini_key_input)
-        
-        # OpenAI
-        openai_label = QLabel("OpenAI")
-        openai_label.setObjectName("sectionTitle")
-        layout.addWidget(openai_label)
-        
-        self.openai_key_input = QLineEdit()
-        self.openai_key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.openai_key_input.setPlaceholderText("sk-...")
-        if self.user_config.openai_api_key:
-            self.openai_key_input.setText(self.user_config.openai_api_key)
-        layout.addWidget(self.openai_key_input)
-        
-        # Anthropic
-        anthropic_label = QLabel("Anthropic")
-        anthropic_label.setObjectName("sectionTitle")
-        layout.addWidget(anthropic_label)
-        
-        self.anthropic_key_input = QLineEdit()
-        self.anthropic_key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.anthropic_key_input.setPlaceholderText("sk-ant-...")
-        if self.user_config.anthropic_api_key:
-            self.anthropic_key_input.setText(self.user_config.anthropic_api_key)
-        layout.addWidget(self.anthropic_key_input)
-        
-        layout.addSpacing(16)
-        
-        # Save button
+
+        layout.addSpacing(12)
+
+        # Provider picker
+        provider_label = QLabel("プロバイダ")
+        provider_label.setObjectName("sectionTitle")
+        layout.addWidget(provider_label)
+
+        self.provider_combo = QComboBox()
+        for key, spec in PROVIDERS.items():
+            self.provider_combo.addItem(spec.label, key)
+        idx = self.provider_combo.findData(self.user_config.ai_provider)
+        if idx >= 0:
+            self.provider_combo.setCurrentIndex(idx)
+        self.provider_combo.setFixedWidth(260)
+        self.provider_combo.currentIndexChanged.connect(self._on_provider_changed)
+        layout.addWidget(self.provider_combo)
+
+        layout.addSpacing(8)
+
+        # API key
+        self.ai_key_label = QLabel("APIキー")
+        self.ai_key_label.setObjectName("sectionTitle")
+        layout.addWidget(self.ai_key_label)
+
+        self.ai_key_input = QLineEdit()
+        self.ai_key_input.setEchoMode(QLineEdit.EchoMode.Password)
+        layout.addWidget(self.ai_key_input)
+
+        self.ai_key_link = QPushButton("キーを取得 →")
+        self.ai_key_link.setObjectName("link")
+        self.ai_key_link.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.ai_key_link.clicked.connect(self._open_provider_key_url)
+        layout.addWidget(self.ai_key_link)
+
+        # Base URL (OpenAI-compatible servers)
+        self.ai_baseurl_label = QLabel("ベースURL")
+        self.ai_baseurl_label.setObjectName("sectionTitle")
+        layout.addWidget(self.ai_baseurl_label)
+
+        self.ai_baseurl_input = QLineEdit()
+        self.ai_baseurl_input.setPlaceholderText("http://localhost:11434/v1")
+        layout.addWidget(self.ai_baseurl_input)
+
+        # Model name
+        self.ai_model_label = QLabel("モデル")
+        self.ai_model_label.setObjectName("sectionTitle")
+        layout.addWidget(self.ai_model_label)
+
+        self.ai_model_input = QLineEdit()
+        layout.addWidget(self.ai_model_input)
+
+        layout.addSpacing(12)
+
         save_row = QHBoxLayout()
         save_row.addStretch()
         save_btn = QPushButton("保存")
         save_btn.setObjectName("primary")
         save_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        save_btn.clicked.connect(self._save_api_keys)
+        save_btn.clicked.connect(self._save_ai_settings)
         save_row.addWidget(save_btn)
         layout.addLayout(save_row)
-        
+
         layout.addStretch()
         self.page_stack.addWidget(page)
+
+        # Populate fields for the initially-selected provider.
+        self._refresh_provider_fields()
+
+    def _refresh_provider_fields(self):
+        """Show/hide and populate the AI fields for the selected provider."""
+        from ..ai_client import PROVIDERS
+
+        provider = self.provider_combo.currentData()
+        spec = PROVIDERS.get(provider)
+        if spec is None:
+            return
+
+        creds = self.user_config.credentials_for(provider)
+
+        # API key (hidden only when a provider never uses one).
+        show_key = spec.needs_api_key or spec.api_key_optional
+        self.ai_key_label.setVisible(show_key)
+        self.ai_key_input.setVisible(show_key)
+        if show_key:
+            placeholder = "APIキー" if spec.needs_api_key else "APIキー（任意）"
+            self.ai_key_input.setPlaceholderText(placeholder)
+            self.ai_key_input.setText(creds["api_key"])
+        self.ai_key_link.setVisible(bool(spec.api_key_url))
+
+        # Base URL (OpenAI-compatible servers).
+        self.ai_baseurl_label.setVisible(spec.needs_base_url)
+        self.ai_baseurl_input.setVisible(spec.needs_base_url)
+        if spec.needs_base_url:
+            self.ai_baseurl_input.setText(creds["base_url"] or spec.default_base_url)
+
+        # Model name.
+        self.ai_model_input.setText(creds["model"] or spec.default_model)
+        self.ai_model_input.setPlaceholderText(spec.default_model or "モデル名")
+
+    def _on_provider_changed(self, _index: int):
+        """Handle AI provider selection change."""
+        self._refresh_provider_fields()
+
+    def _open_provider_key_url(self):
+        from ..ai_client import PROVIDERS
+
+        spec = PROVIDERS.get(self.provider_combo.currentData())
+        if spec and spec.api_key_url:
+            import webbrowser
+            webbrowser.open(spec.api_key_url)
     
     def _on_nav_changed(self, index: int):
         """Handle navigation change."""
@@ -1312,7 +1407,8 @@ class MainWindow(QMainWindow):
                 self.transcriber,
                 self.ai_client,
                 audio_data,
-                self._process_with_ai and self.ai_client is not None
+                self._process_with_ai and self.ai_client is not None,
+                auto_type=self._auto_type,
             )
             self._worker.transcription_done.connect(self._on_transcription_done)
             self._worker.ai_chunk.connect(self._on_ai_chunk)
@@ -1368,9 +1464,12 @@ class MainWindow(QMainWindow):
         self.tray_icon.setIcon(self._icon_normal)
         self.tray_icon.setToolTip("Chotto Voice 🎤")
         self.overlay.set_state("idle")
-        
-        print(f"[Finished] text='{text[:30] if text else '(empty)'}...', auto_type={self._auto_type}", flush=True)
-        if text and self._auto_type:
+
+        # If the worker streamed the text into the field already, don't retype.
+        already_typed = bool(self._worker and self._worker.typed_inline)
+        print(f"[Finished] text='{text[:30] if text else '(empty)'}...', "
+              f"auto_type={self._auto_type}, already_typed={already_typed}", flush=True)
+        if text and self._auto_type and not already_typed:
             # Small delay then type to focused field
             QTimer.singleShot(100, lambda: self._type_result(text))
     
@@ -1422,82 +1521,79 @@ class MainWindow(QMainWindow):
         """Update mute indicator."""
         self.mute_indicator.setText("🔇" if is_muted else "🔊")
     
-    def _save_api_keys(self):
-        """Save API keys and reinitialize clients."""
-        openai_key = self.openai_key_input.text().strip()
-        anthropic_key = self.anthropic_key_input.text().strip()
-        gemini_key = self.gemini_key_input.text().strip()
-        
-        # Save to config
-        self.user_config.update(
-            openai_api_key=openai_key,
-            anthropic_api_key=anthropic_key,
-            gemini_api_key=gemini_key
+    def _save_ai_settings(self):
+        """Persist the selected AI provider's settings and rebuild the client."""
+        from ..ai_client import PROVIDERS, create_ai_client
+
+        provider = self.provider_combo.currentData()
+        spec = PROVIDERS.get(provider)
+        if spec is None:
+            return
+
+        api_key = self.ai_key_input.text().strip() if self.ai_key_input.isVisible() else ""
+        base_url = self.ai_baseurl_input.text().strip() if self.ai_baseurl_input.isVisible() else ""
+        model = self.ai_model_input.text().strip()
+
+        # Persist generically, and mirror cloud keys to the legacy fields so the
+        # Whisper API path and older code keep working.
+        self.user_config.set_provider_settings(
+            provider, api_key=api_key, base_url=base_url, model=model
         )
-        
-        # Reinitialize transcriber if OpenAI key provided
-        if openai_key:
+        legacy_field = {
+            "gemini": "gemini_api_key",
+            "claude": "anthropic_api_key",
+            "openai": "openai_api_key",
+        }.get(provider)
+        updates = {"ai_provider": provider}
+        if legacy_field and api_key:
+            updates[legacy_field] = api_key
+        self.user_config.update(**updates)
+
+        # Validate readiness.
+        if spec.needs_api_key and not api_key:
+            self.status_label.setText("⚠️ APIキーを入力してください")
+            self.status_label.setStyleSheet("color: orange;")
+            return
+        if spec.needs_base_url and not (base_url or spec.default_base_url):
+            self.status_label.setText("⚠️ ベースURLを入力してください")
+            self.status_label.setStyleSheet("color: orange;")
+            return
+
+        # Rebuild the AI client.
+        self.ai_client = None
+        try:
+            self.ai_client = create_ai_client(
+                provider=provider,
+                api_key=api_key,
+                model=model or None,
+                base_url=base_url or None,
+            )
+            self.ai_process_check.setEnabled(True)
+            self.status_label.setText(f"✅ {spec.label} を設定しました")
+            self.status_label.setStyleSheet("color: green;")
+            print(f"AI client: {spec.label}")
+        except Exception as e:
+            self.status_label.setText(f"❌ AI初期化エラー: {e}")
+            self.status_label.setStyleSheet("color: red;")
+            print(f"AI client error: {e}")
+
+        # If an OpenAI key was provided, the API transcriber becomes available.
+        if provider == "openai" and api_key:
             try:
                 from ..transcriber import create_transcriber
+                from ..user_config import WHISPER_OPENAI_API
                 self.transcriber = create_transcriber(
-                    provider="openai_api",
-                    api_key=openai_key,
-                    model="whisper-1"
+                    provider=WHISPER_OPENAI_API, api_key=api_key, model="whisper-1"
                 )
                 self.record_btn.setEnabled(True)
-                self.status_label.setText("✅ APIキー保存完了")
-                self.status_label.setStyleSheet("color: green;")
             except Exception as e:
-                self.status_label.setText(f"❌ Transcriber初期化エラー: {e}")
-                self.status_label.setStyleSheet("color: red;")
-        
-        # Reinitialize AI client (prefer Gemini=free, then Anthropic, then OpenAI)
-        self.ai_client = None
-        if gemini_key:
-            try:
-                from ..ai_client import create_ai_client
-                self.ai_client = create_ai_client(
-                    provider="gemini",
-                    api_key=gemini_key,
-                    model="gemini-2.0-flash"
-                )
-                self.ai_process_check.setEnabled(True)
-                print("AI client: Google Gemini")
-            except Exception as e:
-                print(f"Gemini client error: {e}")
-        
-        if not self.ai_client and anthropic_key:
-            try:
-                from ..ai_client import create_ai_client
-                self.ai_client = create_ai_client(
-                    provider="claude",
-                    api_key=anthropic_key,
-                    model="claude-sonnet-4-20250514"
-                )
-                self.ai_process_check.setEnabled(True)
-                print("AI client: Claude")
-            except Exception as e:
-                print(f"Claude client error: {e}")
-        
-        if not self.ai_client and openai_key:
-            try:
-                from ..ai_client import create_ai_client
-                self.ai_client = create_ai_client(
-                    provider="openai",
-                    api_key=openai_key,
-                    model="gpt-4o"
-                )
-                self.ai_process_check.setEnabled(True)
-                print("AI client: OpenAI GPT")
-            except Exception as e:
-                print(f"AI client error: {e}")
-        
-        # Show notification
+                print(f"Transcriber init error: {e}")
+
         self.tray_icon.showMessage(
             "Chotto Voice",
-            "APIキーを保存しました。",
+            "AI設定を保存しました。",
             QSystemTrayIcon.MessageIcon.Information,
-            2000
+            2000,
         )
     
     def _on_auto_type_changed(self, checked: bool):

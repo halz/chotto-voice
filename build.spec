@@ -18,6 +18,7 @@ a = Analysis(
         'numpy',
         'anthropic',
         'openai',
+        'httpx',
         'google.genai',
         'whisper',
         'tiktoken',

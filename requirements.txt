@@ -33,5 +33,10 @@ comtypes>=1.2.0; sys_platform == "win32"
 # Startup shortcut (Windows)
 pywin32>=306; sys_platform == "win32"
 
+# Accessibility APIs for floating the indicator near the focused text box (macOS)
+pyobjc-framework-Cocoa>=10.0; sys_platform == "darwin"
+pyobjc-framework-ApplicationServices>=10.0; sys_platform == "darwin"
+pyobjc-framework-Quartz>=10.0; sys_platform == "darwin"
+
 # Build/Package
 pyinstaller>=6.0.0
