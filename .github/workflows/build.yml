@@ -4,8 +4,6 @@ on:
   push:
     tags:
       - 'v*'
-    branches:
-      - 'claude/**'
   pull_request:
   workflow_dispatch:
 
