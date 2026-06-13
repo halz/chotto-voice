@@ -18,10 +18,10 @@ class Settings(BaseSettings):
     anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     
-    # AI Provider Settings
-    ai_provider: Literal["claude", "openai"] = "claude"
-    claude_model: str = "claude-sonnet-4-20250514"
-    openai_model: str = "gpt-4o"
+    # AI Provider Settings (env-level defaults; the UI config takes precedence)
+    ai_provider: Literal["claude", "openai", "gemini"] = "gemini"
+    claude_model: str = "claude-haiku-4-5"
+    openai_model: str = "gpt-4o-mini"
     
     # Whisper Settings
     whisper_provider: Literal["openai_api", "local"] = "openai_api"

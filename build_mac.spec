@@ -19,6 +19,7 @@ a = Analysis(
         'numpy',
         'anthropic',
         'openai',
+        'httpx',
         'google.genai',
         'whisper',
         'tiktoken',
@@ -29,6 +30,10 @@ a = Analysis(
         'pydantic',
         'pydantic_settings',
         'dotenv',
+        # macOS accessibility APIs for caret-following indicator
+        'objc',
+        'ApplicationServices',
+        'Quartz',
     ],
     hookspath=[],
     hooksconfig={},

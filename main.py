@@ -14,73 +14,71 @@ from src.ui.main_window import MainWindow, FirstRunSetupDialog
 
 def create_transcriber_from_config(user_config, settings):
     """Create transcriber based on user config."""
+    from src.user_config import WHISPER_LOCAL, WHISPER_OPENAI_API
+
     openai_key = user_config.openai_api_key or settings.openai_api_key
     whisper_provider = user_config.whisper_provider
-    
+
     try:
-        if whisper_provider == "local":
-            transcriber = create_transcriber(
-                provider="local",
-                model=user_config.whisper_local_model
-            )
-            print(f"Using local Whisper ({user_config.whisper_local_model})")
-            return transcriber
-        elif openai_key:
-            transcriber = create_transcriber(
-                provider="openai_api",
-                api_key=openai_key,
-                model="whisper-1"
-            )
+        if whisper_provider == WHISPER_OPENAI_API and openai_key:
             print("Using OpenAI Whisper API")
-            return transcriber
-        else:
-            print("Warning: Whisper API selected but no OpenAI key provided")
-            print("Falling back to local Whisper")
-            transcriber = create_transcriber(
-                provider="local",
-                model=user_config.whisper_local_model
+            return create_transcriber(
+                provider=WHISPER_OPENAI_API,
+                api_key=openai_key,
+                model="whisper-1",
             )
-            return transcriber
+        if whisper_provider == WHISPER_OPENAI_API:
+            print("Warning: Whisper API selected but no OpenAI key; using local")
+        return create_transcriber(
+            provider=WHISPER_LOCAL,
+            model=user_config.whisper_local_model,
+        )
     except Exception as e:
         print(f"Warning: Transcriber error: {e}")
         print("音声認識が利用できません。")
         return None
 
 
+def _provider_is_ready(spec, creds) -> bool:
+    """Whether a provider has enough configuration to be usable."""
+    if spec.needs_api_key and not creds["api_key"]:
+        return False
+    if spec.needs_base_url and not (creds["base_url"] or spec.default_base_url):
+        return False
+    return True
+
+
 def create_ai_client_from_config(user_config, settings):
-    """Create AI client based on user config."""
-    gemini_key = user_config.gemini_api_key
-    anthropic_key = user_config.anthropic_api_key or settings.anthropic_api_key
-    openai_key = user_config.openai_api_key or settings.openai_api_key
-    
-    try:
-        if gemini_key:
+    """Create an AI client for the user's selected provider.
+
+    Tries the explicitly selected provider first, then falls back to any other
+    provider that has sufficient configuration.
+    """
+    from src.ai_client import PROVIDERS
+
+    ordered = [user_config.ai_provider] + [
+        p for p in PROVIDERS if p != user_config.ai_provider
+    ]
+
+    for provider in ordered:
+        spec = PROVIDERS.get(provider)
+        if spec is None:
+            continue
+        creds = user_config.credentials_for(provider)
+        if not _provider_is_ready(spec, creds):
+            continue
+        try:
             client = create_ai_client(
-                provider="gemini",
-                api_key=gemini_key,
-                model="gemini-2.0-flash"
+                provider=provider,
+                api_key=creds["api_key"],
+                model=creds["model"] or None,
+                base_url=creds["base_url"] or None,
             )
-            print("Using Google Gemini for AI processing")
+            print(f"Using {spec.label} for AI processing")
             return client
-        elif anthropic_key:
-            client = create_ai_client(
-                provider="claude",
-                api_key=anthropic_key,
-                model=settings.claude_model
-            )
-            print("Using Claude for AI processing")
-            return client
-        elif openai_key:
-            client = create_ai_client(
-                provider="openai",
-                api_key=openai_key,
-                model=settings.openai_model
-            )
-            print("Using OpenAI GPT for AI processing")
-            return client
-    except Exception as e:
-        print(f"Warning: AI client error: {e}")
-    
+        except Exception as e:
+            print(f"Warning: {provider} client error: {e}")
+
     return None
 
 
